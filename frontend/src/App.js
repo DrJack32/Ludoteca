@@ -1132,7 +1132,18 @@ function App() {
                           />
                         )}
                         <div className="flex-1">
-                          <h3 className="text-xl font-bold text-purple-800 mb-2">{game.nombre}</h3>
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="text-xl font-bold text-purple-800">{game.nombre}</h3>
+                            <button
+                              onClick={() => {
+                                setEditingGame(game);
+                                setCurrentView('edit');
+                              }}
+                              className="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
+                            >
+                              ✏️ Editar
+                            </button>
+                          </div>
                           <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
                             <div>
                               {game.autor && <p><strong>Autor:</strong> {game.autor}</p>}
