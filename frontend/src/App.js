@@ -1390,6 +1390,8 @@ function App() {
     switch (currentView) {
       case 'add':
         return <AddGameScreen />;
+      case 'edit':
+        return <EditGameScreen />;
       case 'search':
         return <SearchScreen />;
       case 'statistics':
