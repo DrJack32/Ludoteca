@@ -1110,6 +1110,15 @@ function App() {
                   >
                     🗑️ Limpiar
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchResults(games);
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-105"
+                  >
+                    📋 Ver Todos
+                  </button>
                 </div>
               </form>
             </div>
