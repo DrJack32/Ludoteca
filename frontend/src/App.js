@@ -1134,15 +1134,35 @@ function App() {
                         <div className="flex-1">
                           <div className="flex items-start justify-between mb-2">
                             <h3 className="text-xl font-bold text-purple-800">{game.nombre}</h3>
-                            <button
-                              onClick={() => {
-                                setEditingGame(game);
-                                setCurrentView('edit');
-                              }}
-                              className="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
-                            >
-                              ✏️ Editar
-                            </button>
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => {
+                                  setEditingGame(game);
+                                  setCurrentView('edit');
+                                }}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (window.confirm(`¿Estás seguro de que quieres eliminar "${game.nombre}"?`)) {
+                                    try {
+                                      await axios.delete(`${API}/games/${game.id}`);
+                                      alert('¡Juego eliminado correctamente!');
+                                      fetchGames();
+                                      handleSearch({ preventDefault: () => {} }); // Refresh search results
+                                    } catch (error) {
+                                      console.error('Error deleting game:', error);
+                                      alert('Error al eliminar el juego');
+                                    }
+                                  }
+                                }}
+                                className="bg-red-500 hover:bg-red-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
+                              >
+                                🗑️ Eliminar
+                              </button>
+                            </div>
                           </div>
                           <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
                             <div>
