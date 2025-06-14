@@ -488,7 +488,440 @@ function App() {
     );
   };
 
-  // Search Screen
+  // Edit Game Screen
+  const EditGameScreen = () => {
+    const [formData, setFormData] = useState({
+      nombre: '',
+      descripcion: '',
+      categoria: '',
+      autor: '',
+      editorial: '',
+      año_publicacion: '',
+      jugadores_minimo: '',
+      jugadores_maximo: '',
+      duracion_minima: '',
+      duracion_maxima: '',
+      complejidad: '',
+      ubicacion_estanteria: '',
+      ubicacion_balda: '',
+      ubicacion_posicion: '',
+      idioma: '',
+      notas: '',
+      imagen: ''
+    });
+
+    // Pre-populate form with existing game data
+    useEffect(() => {
+      if (editingGame) {
+        setFormData({
+          nombre: editingGame.nombre || '',
+          descripcion: editingGame.descripcion || '',
+          categoria: editingGame.categoria || '',
+          autor: editingGame.autor || '',
+          editorial: editingGame.editorial || '',
+          año_publicacion: editingGame.año_publicacion ? editingGame.año_publicacion.toString() : '',
+          jugadores_minimo: editingGame.jugadores_minimo ? editingGame.jugadores_minimo.toString() : '',
+          jugadores_maximo: editingGame.jugadores_maximo ? editingGame.jugadores_maximo.toString() : '',
+          duracion_minima: editingGame.duracion_minima ? editingGame.duracion_minima.toString() : '',
+          duracion_maxima: editingGame.duracion_maxima ? editingGame.duracion_maxima.toString() : '',
+          complejidad: editingGame.complejidad ? editingGame.complejidad.toString() : '',
+          ubicacion_estanteria: editingGame.ubicacion_estanteria || '',
+          ubicacion_balda: editingGame.ubicacion_balda || '',
+          ubicacion_posicion: editingGame.ubicacion_posicion || '',
+          idioma: editingGame.idioma || '',
+          notas: editingGame.notas || '',
+          imagen: editingGame.imagen || ''
+        });
+      }
+    }, [editingGame]);
+
+    const handleInputChange = (e) => {
+      const { name, value } = e.target;
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    };
+
+    const handleImageUpload = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setFormData(prev => ({
+            ...prev,
+            imagen: event.target.result
+          }));
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const submitData = {
+          ...formData,
+          año_publicacion: formData.año_publicacion ? parseInt(formData.año_publicacion) : null,
+          jugadores_minimo: formData.jugadores_minimo ? parseInt(formData.jugadores_minimo) : null,
+          jugadores_maximo: formData.jugadores_maximo ? parseInt(formData.jugadores_maximo) : null,
+          duracion_minima: formData.duracion_minima ? parseInt(formData.duracion_minima) : null,
+          duracion_maxima: formData.duracion_maxima ? parseInt(formData.duracion_maxima) : null,
+          complejidad: formData.complejidad ? parseInt(formData.complejidad) : null,
+        };
+
+        await axios.put(`${API}/games/${editingGame.id}`, submitData);
+        alert('¡Juego actualizado correctamente!');
+        fetchGames();
+        fetchAutocompleteData();
+        setEditingGame(null);
+        setCurrentView('home');
+      } catch (error) {
+        console.error('Error updating game:', error);
+        alert('Error al actualizar el juego');
+      }
+    };
+
+    if (!editingGame) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-4xl mb-4">❌</div>
+            <p className="text-xl text-purple-600">No hay juego seleccionado para editar</p>
+            <button
+              onClick={() => setCurrentView('home')}
+              className="btn-primary mt-4"
+            >
+              Volver al Inicio
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <h1 className="text-4xl font-bold text-purple-800">✏️ Editar Juego</h1>
+              <div className="space-x-2">
+                <button
+                  onClick={() => {
+                    setEditingGame(null);
+                    setCurrentView('search');
+                  }}
+                  className="back-button"
+                >
+                  ← Volver a Búsqueda
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingGame(null);
+                    setCurrentView('home');
+                  }}
+                  className="back-button"
+                >
+                  🏠 Inicio
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+              <p className="text-yellow-800">
+                <strong>Editando:</strong> {editingGame.nombre}
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8">
+              {/* Información Básica */}
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-purple-700 mb-6 border-b border-purple-200 pb-2">
+                  📋 Información Básica
+                </h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="form-label">Nombre del Juego *</label>
+                    <input
+                      type="text"
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Categoría</label>
+                    <input
+                      type="text"
+                      name="categoria"
+                      value={formData.categoria}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="categorias"
+                    />
+                    <datalist id="categorias">
+                      {autocompleteData.categorias?.map(cat => (
+                        <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="form-label">Descripción</label>
+                    <textarea
+                      name="descripcion"
+                      value={formData.descripcion}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      rows="3"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Autor</label>
+                    <input
+                      type="text"
+                      name="autor"
+                      value={formData.autor}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="autores"
+                    />
+                    <datalist id="autores">
+                      {autocompleteData.autores?.map(autor => (
+                        <option key={autor} value={autor} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Editorial</label>
+                    <input
+                      type="text"
+                      name="editorial"
+                      value={formData.editorial}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="editoriales"
+                    />
+                    <datalist id="editoriales">
+                      {autocompleteData.editoriales?.map(editorial => (
+                        <option key={editorial} value={editorial} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Año de Publicación</label>
+                    <input
+                      type="number"
+                      name="año_publicacion"
+                      value={formData.año_publicacion}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      min="1900"
+                      max="2030"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Idioma</label>
+                    <input
+                      type="text"
+                      name="idioma"
+                      value={formData.idioma}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="idiomas"
+                    />
+                    <datalist id="idiomas">
+                      {autocompleteData.idiomas?.map(idioma => (
+                        <option key={idioma} value={idioma} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detalles del Juego */}
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-purple-700 mb-6 border-b border-purple-200 pb-2">
+                  🎮 Detalles del Juego
+                </h2>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="form-label">Jugadores Mínimo</label>
+                    <input
+                      type="number"
+                      name="jugadores_minimo"
+                      value={formData.jugadores_minimo}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Jugadores Máximo</label>
+                    <input
+                      type="number"
+                      name="jugadores_maximo"
+                      value={formData.jugadores_maximo}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Complejidad (1-5)</label>
+                    <select
+                      name="complejidad"
+                      value={formData.complejidad}
+                      onChange={handleInputChange}
+                      className="form-input"
+                    >
+                      <option value="">Seleccionar</option>
+                      <option value="1">1 - Muy Fácil</option>
+                      <option value="2">2 - Fácil</option>
+                      <option value="3">3 - Medio</option>
+                      <option value="4">4 - Difícil</option>
+                      <option value="5">5 - Muy Difícil</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Duración Mínima (min)</label>
+                    <input
+                      type="number"
+                      name="duracion_minima"
+                      value={formData.duracion_minima}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Duración Máxima (min)</label>
+                    <input
+                      type="number"
+                      name="duracion_maxima"
+                      value={formData.duracion_maxima}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Ubicación */}
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-purple-700 mb-6 border-b border-purple-200 pb-2">
+                  📍 Ubicación
+                </h2>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="form-label">Estantería</label>
+                    <input
+                      type="text"
+                      name="ubicacion_estanteria"
+                      value={formData.ubicacion_estanteria}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="estanterias"
+                    />
+                    <datalist id="estanterias">
+                      {autocompleteData.ubicaciones_estanteria?.map(est => (
+                        <option key={est} value={est} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Balda</label>
+                    <input
+                      type="text"
+                      name="ubicacion_balda"
+                      value={formData.ubicacion_balda}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="baldas"
+                    />
+                    <datalist id="baldas">
+                      {autocompleteData.ubicaciones_balda?.map(balda => (
+                        <option key={balda} value={balda} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Posición</label>
+                    <input
+                      type="text"
+                      name="ubicacion_posicion"
+                      value={formData.ubicacion_posicion}
+                      onChange={handleInputChange}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Imagen y Notas */}
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-purple-700 mb-6 border-b border-purple-200 pb-2">
+                  🖼️ Imagen y Notas
+                </h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="form-label">Imagen del Juego</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="form-input"
+                    />
+                    {formData.imagen && (
+                      <div className="mt-4">
+                        <img
+                          src={formData.imagen}
+                          alt="Preview"
+                          className="w-32 h-32 object-cover rounded-lg border-2 border-purple-200"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="form-label">Notas</label>
+                    <textarea
+                      name="notas"
+                      value={formData.notas}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      rows="4"
+                      placeholder="Notas adicionales sobre el juego..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingGame(null);
+                    setCurrentView('search');
+                  }}
+                  className="btn-secondary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                >
+                  💾 Actualizar Juego
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const SearchScreen = () => {
     const [searchFilters, setSearchFilters] = useState({
       nombre: '',
