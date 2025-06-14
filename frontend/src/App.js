@@ -12,6 +12,7 @@ function App() {
   const [autocompleteData, setAutocompleteData] = useState({});
   const [statistics, setStatistics] = useState(null);
   const [locations, setLocations] = useState({});
+  const [editingGame, setEditingGame] = useState(null);
 
   // Fetch initial data
   useEffect(() => {
