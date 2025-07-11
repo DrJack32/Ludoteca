@@ -16,6 +16,7 @@ function App() {
   const [statistics, setStatistics] = useState(null);
   const [locations, setLocations] = useState({});
   const [editingGame, setEditingGame] = useState(null);
+  const { isNative, saveLocalData, getLocalData, shareGame } = useCapacitor();
 
   // Fetch initial data
   useEffect(() => {
