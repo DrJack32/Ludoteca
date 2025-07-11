@@ -1,0 +1,206 @@
+/* Mobile-specific styles for Capacitor app */
+
+/* Touch-friendly buttons */
+@media (max-width: 768px) {
+  .nav-button {
+    min-height: 120px;
+    padding: 1rem;
+  }
+  
+  .nav-button div:first-child {
+    font-size: 2rem;
+  }
+  
+  .nav-button h3 {
+    font-size: 1rem;
+  }
+  
+  .nav-button p {
+    font-size: 0.75rem;
+  }
+  
+  /* Larger touch targets */
+  .btn-primary,
+  .btn-secondary,
+  .back-button {
+    min-height: 44px;
+    padding: 12px 20px;
+  }
+  
+  /* Mobile form inputs */
+  .form-input {
+    padding: 16px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  /* Mobile-friendly game cards */
+  .game-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .game-card .flex {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .game-card img {
+    width: 100%;
+    max-width: 200px;
+    height: 120px;
+    align-self: center;
+  }
+  
+  /* Mobile stats cards */
+  .stats-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  /* Mobile navigation */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 8px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+  }
+  
+  .mobile-nav-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    color: #6b7280;
+    text-decoration: none;
+    border-radius: 8px;
+  }
+  
+  .mobile-nav-item.active {
+    background: #8b5cf6;
+    color: white;
+  }
+  
+  /* Safe area for notched devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Scrollable content */
+  .mobile-content {
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding-bottom: 60px; /* Space for mobile nav */
+  }
+  
+  /* Mobile search form */
+  .mobile-search-form {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  /* Mobile image capture */
+  .mobile-image-capture {
+    position: relative;
+  }
+  
+  .mobile-image-capture button {
+    width: 100%;
+    padding: 16px;
+    margin-bottom: 8px;
+  }
+  
+  /* Responsive grid adjustments */
+  .grid {
+    gap: 12px;
+  }
+  
+  .md\:grid-cols-2,
+  .lg\:grid-cols-3,
+  .lg\:grid-cols-4 {
+    grid-template-columns: 1fr;
+  }
+  
+  .md\:grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Mobile location cards */
+  .location-card {
+    margin-bottom: 16px;
+  }
+  
+  .location-card h2 {
+    font-size: 1.25rem;
+  }
+  
+  .location-card .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Mobile-optimized forms */
+  .mobile-form-section {
+    margin-bottom: 24px;
+  }
+  
+  .mobile-form-section h2 {
+    font-size: 1.125rem;
+    margin-bottom: 16px;
+  }
+  
+  /* Better touch scrolling */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+  }
+  
+  /* Mobile modal adjustments */
+  .modal {
+    margin: 16px;
+    max-height: calc(100vh - 32px);
+  }
+  
+  /* Status bar color */
+  .status-bar {
+    background: #8b5cf6;
+    height: env(safe-area-inset-top);
+  }
+}
+
+/* Landscape mode adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .nav-button {
+    min-height: 80px;
+  }
+  
+  .mobile-content {
+    max-height: calc(100vh - 80px);
+  }
+}
+
+/* Dark mode support for mobile */
+@media (prefers-color-scheme: dark) {
+  .mobile-nav {
+    background: #1f2937;
+    color: #f3f4f6;
+  }
+  
+  .mobile-nav-item {
+    color: #9ca3af;
+  }
+  
+  .mobile-nav-item.active {
+    background: #7c3aed;
+    color: white;
+  }
+}
