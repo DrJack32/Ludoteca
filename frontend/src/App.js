@@ -109,21 +109,26 @@ function App() {
 
   // Home Screen
   const HomeScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 safe-area-top">
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-purple-800 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-purple-800 mb-4">
             🎲 Mi Ludoteca
           </h1>
-          <p className="text-xl text-purple-600 mb-2">
+          <p className="text-lg md:text-xl text-purple-600 mb-2">
             Sistema de Gestión de Juegos de Mesa
           </p>
-          <p className="text-lg text-purple-500">
+          <p className="text-base md:text-lg text-purple-500">
             {games.length} juegos en tu colección
           </p>
+          {isNative && (
+            <p className="text-sm text-green-600 mt-2">
+              📱 Versión Móvil - Funciona sin conexión
+            </p>
+          )}
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto">
           <button
             onClick={() => setCurrentView('add')}
             className="nav-button bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
