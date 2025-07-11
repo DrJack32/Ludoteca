@@ -49,8 +49,21 @@ function App() {
     try {
       const response = await axios.get(`${API}/games`);
       setGames(response.data);
+      
+      // Cache data for offline use
+      if (isNative) {
+        await saveLocalData('games', response.data);
+      }
     } catch (error) {
       console.error('Error fetching games:', error);
+      
+      // Try to load from cache if network fails
+      if (isNative) {
+        const cachedGames = await getLocalData('games');
+        if (cachedGames) {
+          setGames(cachedGames);
+        }
+      }
     }
   };
 
@@ -58,8 +71,21 @@ function App() {
     try {
       const response = await axios.get(`${API}/autocomplete`);
       setAutocompleteData(response.data);
+      
+      // Cache data for offline use
+      if (isNative) {
+        await saveLocalData('autocomplete', response.data);
+      }
     } catch (error) {
       console.error('Error fetching autocomplete data:', error);
+      
+      // Try to load from cache if network fails
+      if (isNative) {
+        const cachedAutocomplete = await getLocalData('autocomplete');
+        if (cachedAutocomplete) {
+          setAutocompleteData(cachedAutocomplete);
+        }
+      }
     }
   };
 
