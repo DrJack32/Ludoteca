@@ -22,7 +22,28 @@ function App() {
   useEffect(() => {
     fetchGames();
     fetchAutocompleteData();
-  }, []);
+    
+    // Load cached data if available (for offline support)
+    if (isNative) {
+      loadCachedData();
+    }
+  }, [isNative]);
+
+  const loadCachedData = async () => {
+    try {
+      const cachedGames = await getLocalData('games');
+      const cachedAutocomplete = await getLocalData('autocomplete');
+      
+      if (cachedGames) {
+        setGames(cachedGames);
+      }
+      if (cachedAutocomplete) {
+        setAutocompleteData(cachedAutocomplete);
+      }
+    } catch (error) {
+      console.error('Error loading cached data:', error);
+    }
+  };
 
   const fetchGames = async () => {
     try {
