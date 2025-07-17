@@ -1,0 +1,58 @@
+{
+  "name": "Mi Ludoteca Android",
+  "appId": "com.ludoteca.app",
+  "version": "1.0.0",
+  "description": "Aplicación Android para gestionar tu colección de juegos de mesa",
+  "author": "Tu Nombre",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tu-usuario/mi-ludoteca.git"
+  },
+  "keywords": ["ludoteca", "juegos", "mesa", "android", "capacitor"],
+  "features": {
+    "web": [
+      "Sistema completo de gestión de juegos",
+      "Búsqueda avanzada con filtros",
+      "Estadísticas visuales",
+      "Gestión de ubicaciones",
+      "Interfaz responsive"
+    ],
+    "android": [
+      "Cámara nativa integrada",
+      "Almacenamiento local offline",
+      "Interfaz optimizada para móvil",
+      "Funcionalidad de compartir",
+      "Botones táctiles optimizados"
+    ]
+  },
+  "requirements": {
+    "development": {
+      "node": ">=14.0.0",
+      "java": ">=11.0.0",
+      "android_sdk": ">=30.0.0"
+    },
+    "runtime": {
+      "android": ">=7.0 (API 24)",
+      "ram": ">=2GB",
+      "storage": ">=50MB"
+    }
+  },
+  "build": {
+    "commands": [
+      "yarn install",
+      "yarn build",
+      "npx cap sync android",
+      "cd android && ./gradlew assembleDebug"
+    ]
+  },
+  "permissions": {
+    "android": [
+      "android.permission.CAMERA",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE"
+    ]
+  }
+}
