@@ -1210,6 +1210,12 @@ function App() {
                                 ✏️ Editar
                               </button>
                               <button
+                                onClick={() => shareGame(game)}
+                                className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
+                              >
+                                📤 Compartir
+                              </button>
+                              <button
                                 onClick={async () => {
                                   if (window.confirm(`¿Estás seguro de que quieres eliminar "${game.nombre}"?`)) {
                                     try {
