@@ -402,6 +402,106 @@ async def bgg_details_endpoint(bgg_id: str, translate: bool = Query(True)):
         raise HTTPException(status_code=500, detail=f"Error al obtener detalles: {e}")
 
 
+# ---------- Backup & Restore ----------
+class BackupData(BaseModel):
+    version: str = "1.0"
+    fecha: str
+    total_juegos: int
+    juegos: List[Dict[str, Any]]
+
+
+class RestoreRequest(BaseModel):
+    juegos: List[Dict[str, Any]]
+    modo: str = "reemplazar"  # "reemplazar" o "fusionar"
+
+
+class RestoreResponse(BaseModel):
+    importados: int
+    actualizados: int
+    omitidos: int
+    eliminados_previos: int
+
+
+@api_router.get("/backup", response_model=BackupData)
+async def export_backup():
+    """Exporta todos los juegos como un backup JSON descargable."""
+    games = await db.games.find({}, {"_id": 0}).to_list(10000)
+    # Convert datetime to ISO string for JSON serialization
+    for g in games:
+        for k in ("fecha_creacion", "fecha_actualizacion"):
+            if isinstance(g.get(k), datetime):
+                g[k] = g[k].isoformat()
+    return BackupData(
+        version="1.0",
+        fecha=datetime.utcnow().isoformat(),
+        total_juegos=len(games),
+        juegos=games,
+    )
+
+
+@api_router.post("/restore", response_model=RestoreResponse)
+async def restore_backup(req: RestoreRequest):
+    """Restaura desde un backup. modo='reemplazar' borra todo antes; modo='fusionar' añade/actualiza por id."""
+    if req.modo not in ("reemplazar", "fusionar"):
+        raise HTTPException(status_code=400, detail="modo debe ser 'reemplazar' o 'fusionar'")
+    if not isinstance(req.juegos, list):
+        raise HTTPException(status_code=400, detail="juegos debe ser una lista")
+
+    eliminados = 0
+    if req.modo == "reemplazar":
+        del_res = await db.games.delete_many({})
+        eliminados = del_res.deleted_count
+
+    importados = 0
+    actualizados = 0
+    omitidos = 0
+    for raw in req.juegos:
+        if not isinstance(raw, dict) or not raw.get("nombre"):
+            omitidos += 1
+            continue
+        # Strip Mongo _id if present
+        raw.pop("_id", None)
+        # Ensure id exists
+        if not raw.get("id"):
+            raw["id"] = str(uuid.uuid4())
+        # Parse datetimes back from ISO strings
+        for k in ("fecha_creacion", "fecha_actualizacion"):
+            v = raw.get(k)
+            if isinstance(v, str):
+                try:
+                    raw[k] = datetime.fromisoformat(v.replace("Z", "+00:00"))
+                except ValueError:
+                    raw[k] = datetime.utcnow()
+        if not raw.get("fecha_creacion"):
+            raw["fecha_creacion"] = datetime.utcnow()
+        raw["fecha_actualizacion"] = datetime.utcnow()
+        # Validate basic schema
+        try:
+            Game(**raw)
+        except Exception:
+            omitidos += 1
+            continue
+
+        if req.modo == "fusionar":
+            existing = await db.games.find_one({"id": raw["id"]})
+            if existing:
+                await db.games.update_one({"id": raw["id"]}, {"$set": raw})
+                actualizados += 1
+            else:
+                await db.games.insert_one(raw)
+                importados += 1
+        else:  # reemplazar
+            await db.games.insert_one(raw)
+            importados += 1
+
+    return RestoreResponse(
+        importados=importados,
+        actualizados=actualizados,
+        omitidos=omitidos,
+        eliminados_previos=eliminados,
+    )
+
+
 # Include the router in the main app
 app.include_router(api_router)
 

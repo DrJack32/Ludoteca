@@ -1522,6 +1522,201 @@ function App() {
     );
   };
 
+  // Backup & Restore panel (used inside Statistics)
+  const BackupRestorePanel = ({ onRestored, totalJuegos }) => {
+    const [restoring, setRestoring] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [confirmFile, setConfirmFile] = useState(null);
+    const [restoreMode, setRestoreMode] = useState('reemplazar');
+    const [message, setMessage] = useState(null);
+
+    const downloadBackup = async () => {
+      setDownloading(true);
+      setMessage(null);
+      try {
+        const res = await axios.get(`${API}/backup`);
+        const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `mi-ludoteca-backup-${date}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setMessage({ type: 'success', text: `✅ Backup descargado (${res.data.total_juegos} juegos).` });
+      } catch (err) {
+        setMessage({ type: 'error', text: '❌ Error al descargar el backup.' });
+      } finally {
+        setDownloading(false);
+      }
+    };
+
+    const handleFileSelect = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setMessage(null);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (!parsed.juegos || !Array.isArray(parsed.juegos)) {
+            setMessage({ type: 'error', text: '❌ Archivo inválido: no contiene una lista de juegos.' });
+            return;
+          }
+          setConfirmFile(parsed);
+        } catch (err) {
+          setMessage({ type: 'error', text: '❌ El archivo no es un JSON válido.' });
+        }
+      };
+      reader.readAsText(file);
+      // reset input so same file can be re-picked
+      e.target.value = '';
+    };
+
+    const confirmRestore = async () => {
+      if (!confirmFile) return;
+      setRestoring(true);
+      setMessage(null);
+      try {
+        const res = await axios.post(`${API}/restore`, {
+          juegos: confirmFile.juegos,
+          modo: restoreMode,
+        });
+        const d = res.data;
+        let msg = `✅ Restauración completada. Importados: ${d.importados}`;
+        if (d.actualizados) msg += `, actualizados: ${d.actualizados}`;
+        if (d.eliminados_previos) msg += `, eliminados previos: ${d.eliminados_previos}`;
+        if (d.omitidos) msg += `, omitidos: ${d.omitidos}`;
+        setMessage({ type: 'success', text: msg });
+        setConfirmFile(null);
+        if (onRestored) onRestored();
+      } catch (err) {
+        setMessage({ type: 'error', text: '❌ Error al restaurar: ' + (err.response?.data?.detail || err.message) });
+      } finally {
+        setRestoring(false);
+      }
+    };
+
+    return (
+      <div className="bg-white rounded-2xl shadow-xl p-6 mb-8" data-testid="backup-restore-panel">
+        <h2 className="text-2xl font-bold text-purple-800 mb-4">💾 Backup y Restauración</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Descarga toda tu ludoteca en un archivo JSON (incluye imágenes y metadatos) para guardarla en lugar seguro.
+          Puedes restaurarla en cualquier momento.
+        </p>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <button
+            onClick={downloadBackup}
+            disabled={downloading}
+            className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold rounded-xl shadow-md transition-all disabled:opacity-60"
+            data-testid="backup-download-btn"
+          >
+            {downloading ? '⏳ Descargando...' : `📥 Descargar Backup (${totalJuegos} juegos)`}
+          </button>
+
+          <label
+            className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold rounded-xl shadow-md transition-all cursor-pointer"
+            data-testid="backup-restore-btn"
+          >
+            📂 Restaurar desde Backup
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={handleFileSelect}
+              className="hidden"
+              data-testid="backup-file-input"
+            />
+          </label>
+        </div>
+
+        {message && (
+          <div
+            className={`mt-4 p-3 rounded-lg border-l-4 ${
+              message.type === 'success'
+                ? 'bg-green-50 border-green-500 text-green-800'
+                : 'bg-red-50 border-red-500 text-red-800'
+            }`}
+            data-testid="backup-message"
+          >
+            {message.text}
+          </div>
+        )}
+
+        {/* Confirm modal */}
+        {confirmFile && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="restore-confirm-modal">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+              <h3 className="text-2xl font-bold text-purple-800 mb-4">⚠️ Confirmar restauración</h3>
+              <p className="text-gray-700 mb-2">
+                El archivo contiene <span className="font-bold">{confirmFile.juegos.length}</span> juegos
+                {confirmFile.fecha && ` (backup del ${new Date(confirmFile.fecha).toLocaleDateString('es-ES')})`}.
+              </p>
+              <p className="text-sm text-gray-500 mb-4">Tu colección actual: <span className="font-semibold">{totalJuegos}</span> juegos.</p>
+
+              <div className="space-y-2 mb-4">
+                <label className="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors"
+                  style={{ borderColor: restoreMode === 'reemplazar' ? '#a855f7' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="restoreMode"
+                    value="reemplazar"
+                    checked={restoreMode === 'reemplazar'}
+                    onChange={() => setRestoreMode('reemplazar')}
+                    className="mt-1"
+                    data-testid="restore-mode-replace"
+                  />
+                  <div>
+                    <div className="font-semibold text-purple-900">🗑️ Reemplazar todo</div>
+                    <div className="text-sm text-gray-600">Elimina los {totalJuegos} juegos actuales y los sustituye por los del backup. <span className="text-red-600 font-semibold">¡Destructivo!</span></div>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors"
+                  style={{ borderColor: restoreMode === 'fusionar' ? '#a855f7' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="restoreMode"
+                    value="fusionar"
+                    checked={restoreMode === 'fusionar'}
+                    onChange={() => setRestoreMode('fusionar')}
+                    className="mt-1"
+                    data-testid="restore-mode-merge"
+                  />
+                  <div>
+                    <div className="font-semibold text-purple-900">🔄 Fusionar</div>
+                    <div className="text-sm text-gray-600">Mantiene los juegos actuales. Los del backup con el mismo ID se actualizan, los nuevos se añaden.</div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmFile(null)}
+                  disabled={restoring}
+                  className="btn-secondary flex-1"
+                  data-testid="restore-cancel-btn"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmRestore}
+                  disabled={restoring}
+                  className="btn-primary flex-1 disabled:opacity-60"
+                  data-testid="restore-confirm-btn"
+                >
+                  {restoring ? '⏳ Restaurando...' : 'Sí, restaurar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Statistics Screen
   const StatisticsScreen = () => {
     if (!statistics) {
@@ -1548,6 +1743,9 @@ function App() {
                 ← Volver al Inicio
               </button>
             </div>
+
+            {/* Backup & Restore */}
+            <BackupRestorePanel onRestored={() => { fetchGames(); fetchStatistics(); fetchAutocompleteData(); }} totalJuegos={statistics.total_juegos} />
 
             {/* Overview Stats */}
             <div className="grid md:grid-cols-4 gap-6 mb-8">

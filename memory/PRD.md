@@ -38,6 +38,13 @@ Aplicación web/móvil (Android) para gestionar una ludoteca personal de 600+ ju
    - Frontend: al subir foto en AddGameScreen, modal automático muestra: "identifying → searching → choosing (top 5) → fetching → done". Selección rellena todos los campos. Búsqueda manual de fallback incluida.
    - Tests pytest `/app/backend/tests/test_ia_bgg.py` (19 casos, 100% pasando).
 
+3. **Backup y Restauración (Feb 2026)**:
+   - Backend `GET /api/backup`: descarga JSON con todos los juegos (incluyendo imágenes base64), versión, fecha y total.
+   - Backend `POST /api/restore`: dos modos:
+     - `reemplazar`: borra todo y restaura desde el archivo (devuelve `eliminados_previos` + `importados`)
+     - `fusionar`: actualiza juegos con mismo ID, añade los nuevos (preserva colección actual)
+   - Frontend: panel `BackupRestorePanel` integrado al inicio de la pantalla Estadísticas. Botones "📥 Descargar Backup" (genera `mi-ludoteca-backup-YYYY-MM-DD.json`) y "📂 Restaurar desde Backup" (file picker + modal de confirmación con radio buttons para elegir modo).
+
 ## Files of reference
 - `/app/backend/server.py`: API routes
 - `/app/backend/game_identifier.py`: lógica IA + BGG + traducción
