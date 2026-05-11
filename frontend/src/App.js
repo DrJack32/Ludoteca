@@ -197,6 +197,117 @@ function App() {
       imagen: ''
     });
 
+    // ---------- IA + BGG state ----------
+    const [iaStatus, setIaStatus] = useState('idle'); // idle | identifying | searching | choosing | fetching | done | error
+    const [iaCandidates, setIaCandidates] = useState([]);
+    const [iaError, setIaError] = useState('');
+    const [iaSearchedTitle, setIaSearchedTitle] = useState('');
+    const [iaManualQuery, setIaManualQuery] = useState('');
+
+    const runAIFlow = async (imageBase64) => {
+      setIaError('');
+      setIaCandidates([]);
+      setIaStatus('identifying');
+      try {
+        // 1) Ask GPT-4o to identify the game
+        const idRes = await axios.post(`${API}/identify-game`, { imagen: imageBase64 });
+        const titulos = idRes.data.titulos || [];
+        if (titulos.length === 0) {
+          setIaStatus('error');
+          setIaError('La IA no reconoció ningún juego en la foto. Puedes buscar a mano abajo.');
+          return;
+        }
+        // 2) Search BGG using the top guess
+        setIaStatus('searching');
+        const topTitle = titulos[0];
+        setIaSearchedTitle(topTitle);
+        setIaManualQuery(topTitle);
+        const bggRes = await axios.get(`${API}/bgg/search`, {
+          params: { q: topTitle, limit: 5 },
+        });
+        if (!bggRes.data || bggRes.data.length === 0) {
+          // Try second candidate if available
+          if (titulos[1]) {
+            const bggRes2 = await axios.get(`${API}/bgg/search`, {
+              params: { q: titulos[1], limit: 5 },
+            });
+            if (bggRes2.data && bggRes2.data.length > 0) {
+              setIaSearchedTitle(titulos[1]);
+              setIaManualQuery(titulos[1]);
+              setIaCandidates(bggRes2.data);
+              setIaStatus('choosing');
+              return;
+            }
+          }
+          setIaStatus('error');
+          setIaError(`No se encontró "${topTitle}" en BGG. Prueba a buscar manualmente.`);
+          return;
+        }
+        setIaCandidates(bggRes.data);
+        setIaStatus('choosing');
+      } catch (err) {
+        console.error('AI flow error:', err);
+        setIaStatus('error');
+        setIaError(err.response?.data?.detail || 'Error al identificar el juego con IA.');
+      }
+    };
+
+    const runManualBggSearch = async () => {
+      if (!iaManualQuery.trim()) return;
+      setIaError('');
+      setIaStatus('searching');
+      try {
+        const bggRes = await axios.get(`${API}/bgg/search`, {
+          params: { q: iaManualQuery.trim(), limit: 5 },
+        });
+        if (!bggRes.data || bggRes.data.length === 0) {
+          setIaStatus('error');
+          setIaError(`Sin resultados en BGG para "${iaManualQuery}".`);
+          return;
+        }
+        setIaCandidates(bggRes.data);
+        setIaSearchedTitle(iaManualQuery);
+        setIaStatus('choosing');
+      } catch (err) {
+        setIaStatus('error');
+        setIaError('Error al buscar en BGG.');
+      }
+    };
+
+    const selectBggCandidate = async (bggId) => {
+      setIaStatus('fetching');
+      setIaError('');
+      try {
+        const det = await axios.get(`${API}/bgg/details/${bggId}`);
+        const d = det.data;
+        setFormData(prev => ({
+          ...prev,
+          nombre: d.nombre || prev.nombre,
+          descripcion: d.descripcion || prev.descripcion,
+          categoria: d.categoria || prev.categoria,
+          autor: d.autor || prev.autor,
+          editorial: d.editorial || prev.editorial,
+          año_publicacion: d.año_publicacion ? String(d.año_publicacion) : prev.año_publicacion,
+          jugadores_minimo: d.jugadores_minimo ? String(d.jugadores_minimo) : prev.jugadores_minimo,
+          jugadores_maximo: d.jugadores_maximo ? String(d.jugadores_maximo) : prev.jugadores_maximo,
+          duracion_minima: d.duracion_minima ? String(d.duracion_minima) : prev.duracion_minima,
+          duracion_maxima: d.duracion_maxima ? String(d.duracion_maxima) : prev.duracion_maxima,
+          complejidad: d.complejidad ? String(d.complejidad) : prev.complejidad,
+        }));
+        setIaStatus('done');
+        setIaCandidates([]);
+      } catch (err) {
+        setIaStatus('error');
+        setIaError('Error al obtener los detalles del juego desde BGG.');
+      }
+    };
+
+    const cancelIa = () => {
+      setIaStatus('idle');
+      setIaCandidates([]);
+      setIaError('');
+    };
+
     const handleInputChange = (e) => {
       const { name, value } = e.target;
       setFormData(prev => ({
@@ -210,10 +321,13 @@ function App() {
       if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
+          const dataUrl = event.target.result;
           setFormData(prev => ({
             ...prev,
-            imagen: event.target.result
+            imagen: dataUrl
           }));
+          // Auto-trigger AI identification
+          runAIFlow(dataUrl);
         };
         reader.readAsDataURL(file);
       }
@@ -245,6 +359,129 @@ function App() {
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+        {/* ---------- IA / BGG modal ---------- */}
+        {iaStatus !== 'idle' && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="ia-modal">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-bold text-purple-800">
+                  🤖 Identificación con IA
+                </h3>
+                <button
+                  onClick={cancelIa}
+                  className="text-gray-500 hover:text-gray-800 text-2xl leading-none"
+                  data-testid="ia-modal-close"
+                >×</button>
+              </div>
+
+              {iaStatus === 'identifying' && (
+                <div className="text-center py-8" data-testid="ia-status-identifying">
+                  <div className="inline-block w-12 h-12 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+                  <p className="text-purple-700 font-medium">Analizando la foto con GPT-4o…</p>
+                </div>
+              )}
+
+              {iaStatus === 'searching' && (
+                <div className="text-center py-8" data-testid="ia-status-searching">
+                  <div className="inline-block w-12 h-12 border-4 border-blue-300 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                  <p className="text-blue-700 font-medium">Buscando en BoardGameGeek…</p>
+                  {iaSearchedTitle && (
+                    <p className="text-sm text-gray-500 mt-1">Consulta: "{iaSearchedTitle}"</p>
+                  )}
+                </div>
+              )}
+
+              {iaStatus === 'fetching' && (
+                <div className="text-center py-8" data-testid="ia-status-fetching">
+                  <div className="inline-block w-12 h-12 border-4 border-green-300 border-t-green-600 rounded-full animate-spin mb-4"></div>
+                  <p className="text-green-700 font-medium">Obteniendo detalles y traduciendo al español…</p>
+                </div>
+              )}
+
+              {iaStatus === 'choosing' && (
+                <div data-testid="ia-status-choosing">
+                  <p className="text-gray-700 mb-4">
+                    Resultados en BGG para <span className="font-semibold">"{iaSearchedTitle}"</span>. Elige el correcto:
+                  </p>
+                  <div className="space-y-3">
+                    {iaCandidates.map((c) => (
+                      <button
+                        key={c.bgg_id}
+                        onClick={() => selectBggCandidate(c.bgg_id)}
+                        className="w-full flex items-center gap-4 p-3 border-2 border-purple-100 hover:border-purple-500 hover:bg-purple-50 rounded-xl transition-all text-left"
+                        data-testid={`ia-candidate-${c.bgg_id}`}
+                      >
+                        {c.thumbnail ? (
+                          <img src={c.thumbnail} alt={c.nombre} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
+                        ) : (
+                          <div className="w-16 h-16 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">🎲</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-purple-900 truncate">{c.nombre}</div>
+                          {c.año && <div className="text-sm text-gray-500">{c.año}</div>}
+                          <div className="text-xs text-purple-500">BGG ID: {c.bgg_id}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600 mb-2">¿Ninguno coincide? Busca a mano:</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={iaManualQuery}
+                        onChange={(e) => setIaManualQuery(e.target.value)}
+                        className="form-input flex-1"
+                        placeholder="Nombre del juego…"
+                        data-testid="ia-manual-search-input"
+                      />
+                      <button onClick={runManualBggSearch} className="btn-primary whitespace-nowrap" data-testid="ia-manual-search-btn">
+                        🔍 Buscar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {iaStatus === 'error' && (
+                <div data-testid="ia-status-error">
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                    <p className="text-red-800 font-medium">⚠️ {iaError}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={iaManualQuery}
+                      onChange={(e) => setIaManualQuery(e.target.value)}
+                      className="form-input flex-1"
+                      placeholder="Buscar manualmente en BGG…"
+                      data-testid="ia-manual-search-input-err"
+                    />
+                    <button onClick={runManualBggSearch} className="btn-primary whitespace-nowrap" data-testid="ia-manual-search-btn-err">
+                      🔍 Buscar
+                    </button>
+                  </div>
+                  <button onClick={cancelIa} className="btn-secondary w-full mt-3" data-testid="ia-skip-btn">
+                    Continuar rellenando manualmente
+                  </button>
+                </div>
+              )}
+
+              {iaStatus === 'done' && (
+                <div className="text-center py-6" data-testid="ia-status-done">
+                  <div className="text-5xl mb-3">✅</div>
+                  <p className="text-green-700 font-semibold mb-4">¡Datos rellenados automáticamente!</p>
+                  <p className="text-sm text-gray-600 mb-4">Revisa los campos y completa la ubicación.</p>
+                  <button onClick={cancelIa} className="btn-primary" data-testid="ia-done-btn">
+                    Perfecto, continuar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-8">
@@ -489,6 +726,12 @@ function App() {
                 <h2 className="text-2xl font-semibold text-purple-700 mb-6 border-b border-purple-200 pb-2">
                   🖼️ Imagen y Notas
                 </h2>
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-purple-900">
+                    <span className="font-semibold">🤖 ¡Magia con IA!</span> Sube una foto de la portada y la IA identificará el juego automáticamente,
+                    buscará en BoardGameGeek y rellenará todos los campos en español.
+                  </p>
+                </div>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
                     <label className="form-label">Imagen del Juego</label>
@@ -497,14 +740,23 @@ function App() {
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="form-input"
+                      data-testid="add-game-image-input"
                     />
                     {formData.imagen && (
-                      <div className="mt-4">
+                      <div className="mt-4 flex items-center gap-3">
                         <img
                           src={formData.imagen}
                           alt="Preview"
                           className="w-32 h-32 object-cover rounded-lg border-2 border-purple-200"
                         />
+                        <button
+                          type="button"
+                          onClick={() => runAIFlow(formData.imagen)}
+                          className="btn-primary text-sm"
+                          data-testid="ia-retry-btn"
+                        >
+                          🤖 Reintentar IA
+                        </button>
                       </div>
                     )}
                   </div>

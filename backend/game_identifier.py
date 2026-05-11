@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 BGG_BASE = "https://boardgamegeek.com/xmlapi2"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+BGG_TOKEN = os.environ.get("BGG_API_TOKEN", "")
+
+
+def _bgg_headers() -> Dict[str, str]:
+    h = {"User-Agent": "MiLudoteca/1.0 (+https://ludoteca.app)"}
+    if BGG_TOKEN:
+        h["Authorization"] = f"Bearer {BGG_TOKEN}"
+    return h
 
 
 # ---------- Pydantic models ----------
@@ -141,7 +149,7 @@ async def bgg_search(query: str, limit: int = 5) -> List[BggSearchResult]:
     """Search BGG for board games by name. Returns top results with thumbnails."""
     if not query.strip():
         return []
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with httpx.AsyncClient(timeout=20.0, headers=_bgg_headers()) as client:
         # Step 1: search
         r = await client.get(
             f"{BGG_BASE}/search",
@@ -195,7 +203,7 @@ async def bgg_search(query: str, limit: int = 5) -> List[BggSearchResult]:
 # ---------- BGG: details + Spanish translation ----------
 async def bgg_get_details(bgg_id: str, translate: bool = True) -> BggDetails:
     """Fetch full BGG details and translate name/description to Spanish via GPT-4o."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, headers=_bgg_headers()) as client:
         r = await client.get(f"{BGG_BASE}/thing", params={"id": bgg_id, "stats": 1})
         if r.status_code != 200:
             raise ValueError(f"BGG returned {r.status_code}")
