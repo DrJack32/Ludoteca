@@ -16,6 +16,16 @@ import re
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+from backend.game_identifier import (
+    identify_game_from_image,
+    bgg_search,
+    bgg_get_details,
+    IdentifyRequest,
+    IdentifyResponse,
+    BggSearchResult,
+    BggDetails,
+)
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -356,6 +366,41 @@ async def get_locations():
         }
     
     return organized_locations
+
+# ---------- IA + BoardGameGeek ----------
+@api_router.post("/identify-game", response_model=IdentifyResponse)
+async def identify_game(req: IdentifyRequest):
+    """Recibe una foto (base64) y devuelve los títulos candidatos detectados por GPT-4o."""
+    if not req.imagen:
+        raise HTTPException(status_code=400, detail="Falta la imagen")
+    try:
+        return await identify_game_from_image(req.imagen)
+    except Exception as e:
+        logger.exception("identify_game failed")
+        raise HTTPException(status_code=500, detail=f"Error al identificar: {e}")
+
+
+@api_router.get("/bgg/search", response_model=List[BggSearchResult])
+async def bgg_search_endpoint(q: str = Query(..., min_length=1), limit: int = Query(5, ge=1, le=10)):
+    """Busca juegos en BoardGameGeek por nombre. Devuelve los mejores resultados con miniatura."""
+    try:
+        return await bgg_search(q, limit=limit)
+    except Exception as e:
+        logger.exception("bgg_search failed")
+        raise HTTPException(status_code=500, detail=f"Error en búsqueda BGG: {e}")
+
+
+@api_router.get("/bgg/details/{bgg_id}", response_model=BggDetails)
+async def bgg_details_endpoint(bgg_id: str, translate: bool = Query(True)):
+    """Obtiene los detalles completos de un juego de BGG (traducido al español si translate=true)."""
+    try:
+        return await bgg_get_details(bgg_id, translate=translate)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("bgg_details failed")
+        raise HTTPException(status_code=500, detail=f"Error al obtener detalles: {e}")
+
 
 # Include the router in the main app
 app.include_router(api_router)
