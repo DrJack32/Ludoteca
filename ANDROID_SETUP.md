@@ -1,206 +1,134 @@
-# 📱 Mi Ludoteca - Aplicación Android
+# Cómo obtener el APK de Mi Ludoteca
 
-## 🎯 Estado del Proyecto
+Tienes **3 caminos** para conseguir el `.apk` instalable en tu Android. Elige el que mejor se adapte a ti. Recomiendo el **Camino 1** porque es el más sencillo: no necesitas instalar nada en tu ordenador.
 
-✅ **Capacitor configurado correctamente**
-✅ **Proyecto Android generado** 
-✅ **Plugins nativos instalados** (Camera, Storage, Filesystem)
-✅ **Build de producción creado**
-✅ **Funcionalidades móviles implementadas**
+---
 
-## 📋 Funcionalidades Implementadas
+## ✅ Camino 1: Compilación automática en la nube con GitHub Actions (RECOMENDADO)
 
-### 🖼️ **Cámara Nativa**
-- Tomar fotos directamente desde la cámara
-- Seleccionar imágenes de la galería
-- Fallback automático para versión web
-- Calidad optimizada (90%) para reducir tamaño
+GitHub compila el APK por ti en sus servidores y te lo entrega listo para descargar. **No necesitas instalar Java, Android Studio, ni nada**. Solo necesitas una cuenta gratuita de GitHub.
 
-### 💾 **Almacenamiento Local**
-- Cache automático de juegos para uso offline
-- Datos de autocompletado almacenados localmente
-- Funcionamiento sin conexión a internet
+### Pasos:
 
-### 📱 **Optimización Mobile**
-- Interfaz adaptada para pantallas táctiles
-- Botones más grandes (mínimo 44px)
-- Navegación optimizada para móviles
-- Soporte para safe areas (iPhone con notch)
-- Prevención de zoom en inputs (iOS)
+1. **Sube tu código a GitHub** desde Emergent:
+   - En el chat de Emergent, busca el botón **"Save to Github"** (arriba a la derecha del chat).
+   - Crea un repositorio nuevo (puede ser privado).
+   - Pulsa "Push" o "Save".
 
-### 🎨 **Mejoras Visuales**
-- CSS específico para móviles
-- Animaciones optimizadas
-- Grids responsivos
-- Scroll táctil mejorado
+2. **GitHub Actions se ejecuta automáticamente**:
+   - Ve a tu repositorio en `https://github.com/TU_USUARIO/NOMBRE_REPO`.
+   - Pulsa la pestaña **"Actions"** (arriba).
+   - Verás un workflow llamado **"Build Android APK"** en ejecución (toma 4–7 minutos).
+   - Espera a que aparezca un ✅ verde.
 
-## 🛠️ Cómo Generar el APK
+3. **Descarga el APK**:
+   - Haz clic en el workflow completado.
+   - Baja hasta la sección **"Artifacts"**.
+   - Pulsa en **`mi-ludoteca-apk`** y se descargará un `.zip`.
+   - Descomprímelo: dentro encontrarás **`mi-ludoteca.apk`**.
 
-### **Prerrequisitos:**
-```bash
-# Instalar Android Studio
-# Instalar Java JDK 11 o superior
-# Instalar Node.js y yarn
-```
+4. **Instala el APK en tu móvil**:
+   - Pasa el archivo `mi-ludoteca.apk` a tu móvil (por cable USB, Google Drive, correo, WhatsApp Web…).
+   - En tu Android, ve a **Ajustes → Seguridad → Instalar apps de orígenes desconocidos** y permite tu explorador de archivos / navegador.
+   - Abre el `.apk` desde el móvil y pulsa **"Instalar"**.
+   - Listo, ya tendrás Mi Ludoteca en tu pantalla de inicio. 🎉
 
-### **Pasos para generar APK:**
+### Si necesitas cambiar la URL del backend más adelante:
+En tu repositorio de GitHub → **Settings → Secrets and variables → Actions → New repository secret**:
+- Nombre: `REACT_APP_BACKEND_URL`
+- Valor: la URL de tu backend (la que aparece en `/app/frontend/.env`)
 
-1. **Clonar el proyecto:**
-```bash
-git clone [tu-repositorio-github]
-cd mi-ludoteca/frontend
-```
+---
 
-2. **Instalar dependencias:**
-```bash
-yarn install
-```
+## 🛠 Camino 2: Compilar en tu ordenador con Android Studio
 
-3. **Build de producción:**
-```bash
-yarn build
-```
+Más lento de configurar la primera vez (~1 h), pero te da control total y podrás generar APKs firmados para la Play Store.
 
-4. **Sincronizar con Android:**
-```bash
-npx cap sync android
-```
+### Requisitos previos (instala una sola vez):
 
-5. **Abrir en Android Studio:**
+1. **Node.js 20+** → https://nodejs.org/
+2. **Yarn** → tras instalar Node, abre la terminal y ejecuta: `npm install -g yarn`
+3. **Java JDK 21** → https://adoptium.net/ (Temurin 21)
+4. **Android Studio** → https://developer.android.com/studio
+   - Durante la instalación deja marcadas todas las casillas (incluido Android SDK).
+   - Al abrirlo por primera vez, deja que descargue componentes (~3 GB).
+
+### Pasos para compilar:
+
+1. **Descarga tu proyecto** desde GitHub (botón verde "Code → Download ZIP") o clonando:
+   ```bash
+   git clone https://github.com/TU_USUARIO/NOMBRE_REPO.git
+   cd NOMBRE_REPO/frontend
+   ```
+
+2. **Instala dependencias y haz build**:
+   ```bash
+   yarn install
+   yarn build
+   npx cap sync android
+   ```
+
+3. **Compila el APK**:
+   ```bash
+   cd android
+   ./gradlew assembleDebug
+   ```
+   *(En Windows usa `gradlew.bat assembleDebug` en lugar de `./gradlew`)*
+
+4. **Encuentra el APK**:
+   ```
+   frontend/android/app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+5. **Instálalo** en tu móvil siguiendo el paso 4 del Camino 1.
+
+### Alternativa visual (sin terminal):
+Después de `yarn build && npx cap sync android`, ejecuta:
 ```bash
 npx cap open android
 ```
+Esto abre Android Studio con tu proyecto. Después: menú **Build → Build Bundle(s) / APK(s) → Build APK(s)**. Espera y pulsa "locate" para encontrarlo.
 
-6. **En Android Studio:**
-   - Build > Generate Signed Bundle/APK
-   - Crear keystore si es necesario
-   - Seleccionar "APK" 
-   - Configurar release
-   - Generate APK
+---
 
-### **Comando alternativo (si tienes Android SDK):**
-```bash
-cd android
-./gradlew assembleRelease
-```
+## 🌐 Camino 3: PWABuilder (la app como Progressive Web App)
 
-## 📁 Estructura del Proyecto
+Si no quieres compilar nada y aceptas pequeñas limitaciones (la cámara nativa de Capacitor no se usa, pero la web funciona perfectamente):
 
-```
-frontend/
-├── android/              # Proyecto Android nativo
-│   ├── app/
-│   │   ├── src/main/
-│   │   │   ├── assets/public/  # Tu app web
-│   │   │   └── java/          # Código Java
-│   │   └── build.gradle
-│   └── build.gradle
-├── src/
-│   ├── components/
-│   │   └── MobileImageCapture.js
-│   ├── hooks/
-│   │   └── useCapacitor.js
-│   ├── App.js             # App principal
-│   ├── mobile.css         # Estilos móviles
-│   └── index.js
-├── capacitor.config.json  # Configuración Capacitor
-└── package.json
-```
+1. Ve a **https://www.pwabuilder.com/**
+2. Pega la URL de tu app: `https://ludoteca-board.preview.emergentagent.com`
+3. Pulsa **Start** → **Package For Stores → Android**.
+4. Descarga el `.apk` generado.
 
-## 🔧 Configuración Actual
+> ⚠️ Este método usa la web envuelta. Si Emergent reinicia el preview, la app puede no funcionar. Para uso estable, usa Camino 1 o 2.
 
-### **capacitor.config.json:**
-```json
-{
-  "appId": "com.ludoteca.app",
-  "appName": "Mi Ludoteca",
-  "webDir": "build",
-  "server": {
-    "androidScheme": "https"
-  },
-  "plugins": {
-    "Camera": {
-      "permissions": ["camera", "photos"]
-    },
-    "Storage": {
-      "group": "CapacitorStorage"
-    }
-  }
-}
-```
+---
 
-### **Plugins Instalados:**
-- `@capacitor/camera` - Cámara y galería
-- `@capacitor/storage` - Almacenamiento local
-- `@capacitor/filesystem` - Sistema de archivos
+## ❓ Preguntas frecuentes
 
-## 🚀 Funcionalidades Especiales
+**¿Por qué no me genera Emergent directamente el APK?**
+El contenedor de Emergent no tiene Java/Android SDK instalados (la compilación de Android pesa ~5 GB), por eso usamos GitHub Actions, que sí lo tiene.
 
-### **1. Modo Offline**
-- Los juegos se guardan automáticamente en cache
-- Funciona sin conexión a internet
-- Sincroniza cuando vuelve la conexión
+**¿El APK necesita internet?**
+Sí, para conectarse al backend. Sin embargo, la app guarda los últimos juegos en caché para verlos sin conexión.
 
-### **2. Cámara Integrada**
-- Botón "Tomar Foto" usa la cámara nativa
-- Botón "Galería" accede a fotos existentes
-- Automáticamente comprime imágenes
+**¿Funciona en cualquier Android?**
+Sí, Android 7.0 (API 24) o superior.
 
-### **3. Interfaz Táctil**
-- Botones grandes para tocar fácilmente
-- Scroll suave en listas
-- Formularios optimizados para móviles
+**¿Cómo actualizo la app cuando cambio el código?**
+Cada vez que pulses "Save to Github" en Emergent, GitHub Actions vuelve a compilar el APK automáticamente. Descárgalo de nuevo desde **Actions → Artifacts** e instálalo encima del anterior.
 
-## 📤 Distribución
+**¿Puedo subirlo a Google Play?**
+Sí, pero necesitas un APK/AAB firmado con tu clave (keystore) y una cuenta de desarrollador de Google (25 USD una sola vez). En Android Studio: **Build → Generate Signed Bundle / APK**.
 
-### **Opciones para distribuir:**
+---
 
-1. **APK directo**
-   - Instalar manualmente en dispositivos
-   - Perfecto para uso personal
+## 🎯 Resumen rápido
 
-2. **Google Play Store**
-   - Crear cuenta de desarrollador (25 USD)
-   - Subir APK firmado
-   - Distribución global
+| Camino | Tiempo | Dificultad | Requiere instalar algo |
+|--------|--------|------------|------------------------|
+| 1. GitHub Actions | 10 min | ⭐ Fácil | No |
+| 2. Android Studio | 1–2 h | ⭐⭐⭐ Media | Sí (~5 GB) |
+| 3. PWABuilder | 5 min | ⭐ Fácil | No (pero más limitado) |
 
-3. **APK por QR**
-   - Subir APK a servicio como APKPure
-   - Generar QR para descarga fácil
-
-## 🛡️ Permisos Requeridos
-
-La app solicitará estos permisos:
-- **Cámara**: Para tomar fotos de juegos
-- **Almacenamiento**: Para guardar fotos y datos
-- **Internet**: Para sincronizar con el servidor
-
-## 📊 Rendimiento
-
-### **Tamaño estimado:**
-- APK: ~15-20 MB
-- Instalación: ~25-30 MB
-- Funciona en Android 7.0+ (API 24+)
-
-### **Compatibilidad:**
-- Android 7.0 o superior
-- Procesador ARM/x86
-- Mínimo 2GB RAM recomendado
-
-## 🔄 Actualizaciones
-
-Para actualizar la app:
-1. Modificar código
-2. Incrementar versión en `package.json`
-3. Hacer nuevo build
-4. Generar nuevo APK
-5. Distribuir actualización
-
-## 🎯 Próximos Pasos
-
-1. **Generar APK** siguiendo los pasos anteriores
-2. **Probar en dispositivo** real
-3. **Optimizar** si es necesario
-4. **Distribuir** a usuarios finales
-
-¡Tu aplicación está lista para convertirse en una app Android completa! 🎉
+**👉 Mi recomendación: Camino 1.**
