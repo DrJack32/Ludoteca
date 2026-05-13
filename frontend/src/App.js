@@ -16,7 +16,7 @@ function App() {
   const [statistics, setStatistics] = useState(null);
   const [locations, setLocations] = useState({});
   const [editingGame, setEditingGame] = useState(null);
-  const { isNative, saveLocalData, getLocalData, shareGame } = useCapacitor();
+  const { isNative, saveLocalData, getLocalData } = useCapacitor();
 
   // Fetch initial data
   useEffect(() => {
@@ -1714,12 +1714,6 @@ function App() {
                                 className="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
                               >
                                 ✏️ Editar
-                              </button>
-                              <button
-                                onClick={() => shareGame(game)}
-                                className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-1 px-3 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
-                              >
-                                📤 Compartir
                               </button>
                               <button
                                 onClick={async () => {
