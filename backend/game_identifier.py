@@ -61,6 +61,13 @@ class BggDetails(BaseModel):
     imagen: str = ""
 
 
+class BggExpansion(BaseModel):
+    bgg_id: str
+    nombre: str
+    año: Optional[int] = None
+    thumbnail: Optional[str] = None
+
+
 # ---------- Helpers ----------
 def _clean_base64(data: str) -> str:
     """Strip 'data:image/...;base64,' prefix if present."""
@@ -362,3 +369,70 @@ async def _translate_to_spanish(name: str, desc: str, categoria: str):
         data.get("descripcion", desc),
         data.get("categoria", categoria),
     )
+
+
+# ---------- BGG: list official expansions of a base game ----------
+async def bgg_get_expansions(bgg_id: str) -> List[BggExpansion]:
+    """Return the list of official expansions linked to a BGG base game (with thumbnails)."""
+    async with httpx.AsyncClient(timeout=30.0, headers=_bgg_headers()) as client:
+        r = await client.get(f"{BGG_BASE}/thing", params={"id": bgg_id})
+        if r.status_code != 200:
+            raise ValueError(f"BGG returned {r.status_code}")
+        root = ET.fromstring(r.text)
+        item = root.find("item")
+        if item is None:
+            raise ValueError("Juego no encontrado en BGG")
+
+        # Collect expansion ids: links with type=boardgameexpansion and inbound!=true
+        exp_links = []
+        for link in item.findall("link"):
+            if link.attrib.get("type") != "boardgameexpansion":
+                continue
+            inbound = link.attrib.get("inbound", "false")
+            # inbound="true" means this game is itself an expansion - skip those
+            if inbound == "true":
+                continue
+            exp_links.append({
+                "bgg_id": link.attrib.get("id", ""),
+                "nombre": link.attrib.get("value", ""),
+            })
+
+        if not exp_links:
+            return []
+
+        # Batch-fetch thumbnails and years (max ~50 per request to keep URL short)
+        details_map: Dict[str, Dict[str, Any]] = {}
+        ids = [e["bgg_id"] for e in exp_links if e["bgg_id"]]
+        for i in range(0, len(ids), 50):
+            batch = ids[i:i + 50]
+            r2 = await client.get(f"{BGG_BASE}/thing", params={"id": ",".join(batch)})
+            if r2.status_code != 200:
+                continue
+            root2 = ET.fromstring(r2.text)
+            for it in root2.findall("item"):
+                bid = it.attrib.get("id", "")
+                thumb_el = it.find("thumbnail")
+                year_el = it.find("yearpublished")
+                year_val = None
+                if year_el is not None:
+                    try:
+                        year_val = int(year_el.attrib.get("value", "0")) or None
+                    except ValueError:
+                        pass
+                details_map[bid] = {
+                    "thumbnail": thumb_el.text if thumb_el is not None and thumb_el.text else None,
+                    "año": year_val,
+                }
+
+    results: List[BggExpansion] = []
+    for e in exp_links:
+        det = details_map.get(e["bgg_id"], {})
+        results.append(BggExpansion(
+            bgg_id=e["bgg_id"],
+            nombre=e["nombre"],
+            año=det.get("año"),
+            thumbnail=det.get("thumbnail"),
+        ))
+    # Sort by year (most recent first), unknowns last
+    results.sort(key=lambda x: (x.año is None, -(x.año or 0)))
+    return results

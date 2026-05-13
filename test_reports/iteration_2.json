@@ -1,0 +1,56 @@
+{
+  "summary": "Backend testing for the new expansiones+bgg_id feature on Game model and the new GET /api/bgg/expansions/{bgg_id} endpoint. 32/32 pytest tests pass against the public REACT_APP_BACKEND_URL. All requested cases covered: BGG expansion listing for Catan (104 items), 404 on invalid id, POST/GET/PUT persistence of bgg_id+expansiones, linking an existing game to BGG via PUT bgg_id, /api/backup includes the two new fields, /api/restore preserves them in both fusionar and reemplazar modes, and the full /api/games + /api/identify-game + /api/bgg/* regression suite from iteration_1 still passes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/bgg/expansions/{bgg_id}",
+        "issue": "Thumbnail enrichment fails for ~96% of expansions (only 4/104 thumbnails returned for Catan id=13). Root cause: bgg_get_expansions in game_identifier.py batches BGG /thing requests of 50 ids; when BGG returns 202 (queued) or 401/403 for large batches, the code silently `continue`s on non-200 (line 409-410) and never retries. Result: año=None and thumbnail=None for the vast majority. Recommend: (a) retry with backoff if status==202, (b) split into smaller batches (e.g. 20), (c) include the BGG_API_TOKEN header consistently and log non-200 responses."
+      },
+      {
+        "endpoint": "GET /api/bgg/expansions/{bgg_id}",
+        "issue": "Whole response completes in ~0.6s instead of the 10-30s mentioned in the spec, confirming the thumbnail batches are being skipped, not awaited. Also no in-memory or DB cache, so each call re-fetches the base XML."
+      },
+      {
+        "endpoint": "PUT /api/games/{id}",
+        "issue": "update comprehension `{k: v for k, v in game_update.dict().items() if v is not None}` correctly drops None but cannot un-set bgg_id (passing null is dropped). If a user wants to UNLINK a game, there is no way to set bgg_id=None via PUT. Not blocking the current UX (link-only) but worth a follow-up if unlinking is required."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_expansions.py",
+    "/app/backend/tests/test_ia_bgg.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/pytest_expansions.xml"
+  ],
+  "action_items": [
+    "Fix thumbnail enrichment in bgg_get_expansions (game_identifier.py L406-425): handle BGG 202/queued responses with a retry/backoff loop or smaller batches; log non-200 batch fetches instead of silently skipping.",
+    "Optional: cache /api/bgg/expansions/{id} per-game in MongoDB to avoid re-hitting BGG every time the EditGameScreen opens.",
+    "Optional: allow PUT /api/games/{id} with bgg_id=null to actually clear it (currently dropped by the None filter)."
+  ],
+  "critical_code_review_comments": [
+    "game_identifier.py L405-425: silent `continue` on non-200 batch /thing responses hides BGG's 202 queued behaviour and is the direct cause of the missing thumbnails / years. Always either retry or log.",
+    "server.py L185 update_data comprehension uses `v is not None`, which is correct for keeping empty list `expansiones=[]` but prevents ever clearing scalar fields like bgg_id, idioma, notas etc. Consider explicit allow-list of clearable fields.",
+    "server.py L379/L389/L401/L425 use `logger.exception` but `logger` is still defined AFTER `app.include_router` (L547). Works at request time but the definition order is fragile — move logger to the top of the file (already flagged in iteration_1).",
+    "server.py POST /api/games returns 200 not 201; not blocking but REST-inconsistent (already flagged in iteration_1).",
+    "Expansion model has `imagen` but BggExpansion has `thumbnail`; frontend must remap. Consider unifying to one field name (`imagen` or `thumbnail`) in both models for clarity."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_expansions.py"
+  ],
+  "success_rate": {
+    "backend": "100% (32/32 pytest, expansions suite 13/13)",
+    "frontend": "not tested (backend only request)"
+  },
+  "test_credentials": "none required (EMERGENT_LLM_KEY & BGG_API_TOKEN preconfigured in /app/backend/.env)",
+  "seed_data_creation": "Tests create TEST_-prefixed games (TEST_Catan_Exp, TEST_NoBGG_Game, TEST_BackupCatan) and clean them up in test_cleanup_test_games. test_restore_reemplazar_preserves_fields wipes the games collection and re-imports the backup snapshot before the cleanup step.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All backend additions for the expansions feature are verified end-to-end: POST/GET/PUT /api/games round-trip bgg_id + expansiones[] (List[Expansion]) correctly, empty expansiones=[] clears them, PUT bgg_id='13' on an unlinked game links it, /api/backup and /api/restore (fusionar & reemplazar) both preserve the new fields, and GET /api/bgg/expansions/13 returns 104 entries with correct ordering (year desc, None last). The single behavioural quirk is in thumbnail enrichment (only 4/104 thumbnails returned, see backend_issues). Frontend (App.js EditGameScreen 'Expansiones' section ~L1252-1430 and link-bgg modal) was NOT tested per the testing_type=backend only directive — would be a good Playwright target next: photo→AI→BGG-select on add, then loadExpansionsFromBgg, toggleExpansion, removeOwnedExpansion, badges in list view.",
+  "rca of the issue": "Thumbnail-missing RCA: BGG XMLAPI2 returns HTTP 202 'Your request has been accepted and put in the queue' for /thing requests that include many ids when the data is not in BGG's cache. bgg_get_expansions (game_identifier.py L405-425) checks `if r2.status_code != 200: continue` and never retries, so the details_map stays empty for those batches. The 4 thumbnails that do show up correspond to the only batch that happened to be served immediately by BGG (or a partially-cached one). Mitigation: implement a poll-with-backoff loop (sleep 2-5s and re-GET) when status_code==202, and/or shrink batch size to ~20. Reproduction: `curl -w '%{time_total}' https://ludoteca-board.preview.emergentagent.com/api/bgg/expansions/13` returns in <1s with 104 items, of which only 4 have non-null thumbnail/año."
+}

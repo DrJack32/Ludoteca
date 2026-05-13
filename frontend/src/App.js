@@ -282,6 +282,7 @@ function App() {
         const d = det.data;
         setFormData(prev => ({
           ...prev,
+          bgg_id: d.bgg_id || bggId,
           nombre: d.nombre || prev.nombre,
           descripcion: d.descripcion || prev.descripcion,
           categoria: d.categoria || prev.categoria,
@@ -815,8 +816,19 @@ function App() {
       ubicacion_posicion: '',
       idioma: '',
       notas: '',
-      imagen: ''
+      imagen: '',
+      bgg_id: null,
+      expansiones: []
     });
+
+    // ---------- Expansion management state ----------
+    const [expLoading, setExpLoading] = useState(false);
+    const [expAvailable, setExpAvailable] = useState([]); // BGG expansions list
+    const [expError, setExpError] = useState('');
+    const [expLinkModal, setExpLinkModal] = useState(false);
+    const [expLinkQuery, setExpLinkQuery] = useState('');
+    const [expLinkResults, setExpLinkResults] = useState([]);
+    const [expLinkSearching, setExpLinkSearching] = useState(false);
 
     // Pre-populate form with existing game data
     useEffect(() => {
@@ -838,10 +850,80 @@ function App() {
           ubicacion_posicion: editingGame.ubicacion_posicion || '',
           idioma: editingGame.idioma || '',
           notas: editingGame.notas || '',
-          imagen: editingGame.imagen || ''
+          imagen: editingGame.imagen || '',
+          bgg_id: editingGame.bgg_id || null,
+          expansiones: editingGame.expansiones || []
         });
+        setExpAvailable([]);
+        setExpError('');
       }
     }, [editingGame]);
+
+    // ---------- Expansion functions ----------
+    const loadExpansionsFromBgg = async () => {
+      if (!formData.bgg_id) return;
+      setExpLoading(true);
+      setExpError('');
+      try {
+        const res = await axios.get(`${API}/bgg/expansions/${formData.bgg_id}`);
+        setExpAvailable(res.data || []);
+        if (!res.data || res.data.length === 0) {
+          setExpError('Este juego no tiene expansiones registradas en BGG.');
+        }
+      } catch (err) {
+        setExpError('Error al cargar las expansiones desde BGG.');
+      } finally {
+        setExpLoading(false);
+      }
+    };
+
+    const toggleExpansion = (bggExp) => {
+      const isOwned = (formData.expansiones || []).some(e => e.bgg_id === bggExp.bgg_id);
+      if (isOwned) {
+        setFormData(prev => ({
+          ...prev,
+          expansiones: prev.expansiones.filter(e => e.bgg_id !== bggExp.bgg_id),
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          expansiones: [
+            ...prev.expansiones,
+            { bgg_id: bggExp.bgg_id, nombre: bggExp.nombre, año: bggExp.año || null, imagen: bggExp.thumbnail || '' },
+          ],
+        }));
+      }
+    };
+
+    const removeOwnedExpansion = (bggId) => {
+      setFormData(prev => ({
+        ...prev,
+        expansiones: prev.expansiones.filter(e => e.bgg_id !== bggId),
+      }));
+    };
+
+    const searchBggForLinking = async () => {
+      if (!expLinkQuery.trim()) return;
+      setExpLinkSearching(true);
+      try {
+        const res = await axios.get(`${API}/bgg/search`, {
+          params: { q: expLinkQuery.trim(), limit: 5 },
+        });
+        setExpLinkResults(res.data || []);
+      } catch (err) {
+        setExpLinkResults([]);
+      } finally {
+        setExpLinkSearching(false);
+      }
+    };
+
+    const linkBggId = (bggId) => {
+      setFormData(prev => ({ ...prev, bgg_id: bggId }));
+      setExpLinkModal(false);
+      setExpLinkResults([]);
+      setExpAvailable([]);
+      setExpError('');
+    };
 
     const handleInputChange = (e) => {
       const { name, value } = e.target;
@@ -1167,6 +1249,178 @@ function App() {
                   </div>
                 </div>
               </div>
+
+              {/* Expansiones */}
+              <div className="mb-8" data-testid="expansions-section">
+                <h2 className="text-2xl font-semibold text-purple-700 mb-6 border-b border-purple-200 pb-2">
+                  📦 Expansiones
+                </h2>
+
+                {/* Owned expansions */}
+                {formData.expansiones && formData.expansiones.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-700 mb-2 font-medium">
+                      Expansiones en tu caja ({formData.expansiones.length}):
+                    </p>
+                    <div className="flex flex-wrap gap-2" data-testid="owned-expansions">
+                      {formData.expansiones.map((e, idx) => (
+                        <div
+                          key={e.bgg_id || idx}
+                          className="flex items-center gap-2 bg-purple-100 text-purple-900 rounded-full pl-3 pr-1 py-1 text-sm"
+                          data-testid={`owned-exp-${e.bgg_id || idx}`}
+                        >
+                          {e.imagen && <img src={e.imagen} alt="" className="w-6 h-6 rounded-full object-cover" />}
+                          <span className="max-w-[300px] truncate">{e.nombre}</span>
+                          {e.año && <span className="text-purple-500">({e.año})</span>}
+                          <button
+                            type="button"
+                            onClick={() => removeOwnedExpansion(e.bgg_id)}
+                            className="ml-1 w-6 h-6 rounded-full bg-purple-200 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                            aria-label="Quitar"
+                            data-testid={`remove-exp-${e.bgg_id || idx}`}
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Link BGG / Load expansions */}
+                {!formData.bgg_id ? (
+                  <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg">
+                    <p className="text-sm text-yellow-900 mb-3">
+                      Este juego aún no está vinculado con BoardGameGeek. Vincúlalo para poder elegir sus expansiones oficiales.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setExpLinkModal(true); setExpLinkQuery(formData.nombre); }}
+                      className="btn-primary text-sm"
+                      data-testid="link-bgg-btn"
+                    >
+                      🔗 Vincular con BoardGameGeek
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                      <p className="text-sm text-gray-600">
+                        Vinculado a BGG ID: <span className="font-mono font-semibold text-purple-700">{formData.bgg_id}</span>
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={loadExpansionsFromBgg}
+                          disabled={expLoading}
+                          className="btn-primary text-sm disabled:opacity-60"
+                          data-testid="load-expansions-btn"
+                        >
+                          {expLoading ? '⏳ Cargando…' : (expAvailable.length > 0 ? '🔄 Recargar' : '⬇️ Cargar expansiones de BGG')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setExpLinkModal(true); setExpLinkQuery(formData.nombre); }}
+                          className="btn-secondary text-sm"
+                          data-testid="relink-bgg-btn"
+                        >
+                          Cambiar vínculo
+                        </button>
+                      </div>
+                    </div>
+
+                    {expError && (
+                      <div className="text-sm text-orange-700 bg-orange-50 p-3 rounded-lg border-l-4 border-orange-500 mb-3">
+                        {expError}
+                      </div>
+                    )}
+
+                    {expAvailable.length > 0 && (
+                      <div className="border border-purple-200 rounded-lg max-h-96 overflow-y-auto" data-testid="bgg-expansions-list">
+                        <p className="text-sm text-gray-600 sticky top-0 bg-white p-3 border-b border-gray-200">
+                          Marca las expansiones que tienes en tu caja ({expAvailable.length} disponibles en BGG):
+                        </p>
+                        <div className="divide-y divide-gray-100">
+                          {expAvailable.map((exp) => {
+                            const owned = (formData.expansiones || []).some(e => e.bgg_id === exp.bgg_id);
+                            return (
+                              <label
+                                key={exp.bgg_id}
+                                className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${owned ? 'bg-purple-50' : 'hover:bg-gray-50'}`}
+                                data-testid={`exp-row-${exp.bgg_id}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={owned}
+                                  onChange={() => toggleExpansion(exp)}
+                                  className="w-5 h-5 accent-purple-600"
+                                  data-testid={`exp-check-${exp.bgg_id}`}
+                                />
+                                {exp.thumbnail ? (
+                                  <img src={exp.thumbnail} alt="" className="w-12 h-12 object-cover rounded" />
+                                ) : (
+                                  <div className="w-12 h-12 bg-purple-100 rounded flex items-center justify-center">📦</div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 truncate">{exp.nombre}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {exp.año && `${exp.año} · `}BGG ID {exp.bgg_id}
+                                  </div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Link BGG modal */}
+                {expLinkModal && (
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="link-bgg-modal">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[85vh] overflow-y-auto p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-2xl font-bold text-purple-800">🔗 Vincular con BGG</h3>
+                        <button onClick={() => setExpLinkModal(false)} className="text-2xl text-gray-500 hover:text-gray-800" data-testid="link-bgg-close">×</button>
+                      </div>
+                      <div className="flex gap-2 mb-4">
+                        <input
+                          type="text"
+                          value={expLinkQuery}
+                          onChange={(e) => setExpLinkQuery(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchBggForLinking(); } }}
+                          className="form-input flex-1"
+                          placeholder="Nombre del juego en BGG…"
+                          data-testid="link-bgg-input"
+                        />
+                        <button onClick={searchBggForLinking} className="btn-primary" disabled={expLinkSearching} data-testid="link-bgg-search-btn">
+                          {expLinkSearching ? '⏳' : '🔍 Buscar'}
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {expLinkResults.map((r) => (
+                          <button
+                            key={r.bgg_id}
+                            onClick={() => linkBggId(r.bgg_id)}
+                            className="w-full flex items-center gap-3 p-2 border-2 border-purple-100 hover:border-purple-500 rounded-lg text-left"
+                            data-testid={`link-bgg-result-${r.bgg_id}`}
+                          >
+                            {r.thumbnail ? <img src={r.thumbnail} alt="" className="w-12 h-12 rounded object-cover" /> : <div className="w-12 h-12 bg-purple-100 rounded flex items-center justify-center">🎲</div>}
+                            <div>
+                              <div className="font-semibold text-purple-900">{r.nombre}</div>
+                              <div className="text-xs text-gray-500">{r.año && `${r.año} · `}BGG ID {r.bgg_id}</div>
+                            </div>
+                          </button>
+                        ))}
+                        {expLinkResults.length === 0 && !expLinkSearching && (
+                          <p className="text-sm text-gray-500 text-center py-4">Escribe el nombre y pulsa Buscar.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
 
               {/* Imagen y Notas */}
               <div className="mb-8">
@@ -1508,6 +1762,25 @@ function App() {
                             <p className="text-sm text-purple-600 mt-2">
                               <strong>📍 Ubicación:</strong> {game.ubicacion_estanteria} - {game.ubicacion_balda} - {game.ubicacion_posicion}
                             </p>
+                          )}
+                          {game.expansiones && game.expansiones.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-purple-100" data-testid={`game-expansions-${game.id}`}>
+                              <p className="text-sm font-semibold text-purple-700 mb-1">
+                                📦 Expansiones en la caja ({game.expansiones.length}):
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {game.expansiones.map((e, idx) => (
+                                  <span
+                                    key={e.bgg_id || idx}
+                                    className="inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-900 px-2 py-1 rounded-full"
+                                  >
+                                    {e.imagen && <img src={e.imagen} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                                    <span>{e.nombre}</span>
+                                    {e.año && <span className="text-purple-500">({e.año})</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>

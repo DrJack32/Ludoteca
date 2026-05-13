@@ -20,10 +20,12 @@ from backend.game_identifier import (
     identify_game_from_image,
     bgg_search,
     bgg_get_details,
+    bgg_get_expansions,
     IdentifyRequest,
     IdentifyResponse,
     BggSearchResult,
     BggDetails,
+    BggExpansion,
 )
 
 # MongoDB connection
@@ -39,6 +41,12 @@ api_router = APIRouter(prefix="/api")
 
 
 # Pydantic Models
+class Expansion(BaseModel):
+    bgg_id: Optional[str] = None
+    nombre: str
+    año: Optional[int] = None
+    imagen: str = ""
+
 class Game(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     nombre: str
@@ -58,6 +66,8 @@ class Game(BaseModel):
     idioma: str = ""
     notas: str = ""
     imagen: str = ""  # base64 encoded image
+    bgg_id: Optional[str] = None
+    expansiones: List[Expansion] = []
     fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
     fecha_actualizacion: datetime = Field(default_factory=datetime.utcnow)
 
@@ -79,6 +89,8 @@ class GameCreate(BaseModel):
     idioma: str = ""
     notas: str = ""
     imagen: str = ""
+    bgg_id: Optional[str] = None
+    expansiones: List[Expansion] = []
 
 class GameUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -98,6 +110,8 @@ class GameUpdate(BaseModel):
     idioma: Optional[str] = None
     notas: Optional[str] = None
     imagen: Optional[str] = None
+    bgg_id: Optional[str] = None
+    expansiones: Optional[List[Expansion]] = None
 
 class SearchFilters(BaseModel):
     nombre: Optional[str] = None
@@ -400,6 +414,18 @@ async def bgg_details_endpoint(bgg_id: str, translate: bool = Query(True)):
     except Exception as e:
         logger.exception("bgg_details failed")
         raise HTTPException(status_code=500, detail=f"Error al obtener detalles: {e}")
+
+
+@api_router.get("/bgg/expansions/{bgg_id}", response_model=List[BggExpansion])
+async def bgg_expansions_endpoint(bgg_id: str):
+    """Lista las expansiones oficiales de un juego en BGG (con miniaturas y año)."""
+    try:
+        return await bgg_get_expansions(bgg_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("bgg_expansions failed")
+        raise HTTPException(status_code=500, detail=f"Error al obtener expansiones: {e}")
 
 
 # ---------- Backup & Restore ----------
