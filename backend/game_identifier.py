@@ -374,7 +374,7 @@ async def _translate_to_spanish(name: str, desc: str, categoria: str):
 # ---------- BGG: list official expansions of a base game ----------
 async def bgg_get_expansions(bgg_id: str) -> List[BggExpansion]:
     """Return the list of official expansions linked to a BGG base game (with thumbnails)."""
-    async with httpx.AsyncClient(timeout=30.0, headers=_bgg_headers()) as client:
+    async with httpx.AsyncClient(timeout=60.0, headers=_bgg_headers()) as client:
         r = await client.get(f"{BGG_BASE}/thing", params={"id": bgg_id})
         if r.status_code != 200:
             raise ValueError(f"BGG returned {r.status_code}")
@@ -400,15 +400,28 @@ async def bgg_get_expansions(bgg_id: str) -> List[BggExpansion]:
         if not exp_links:
             return []
 
-        # Batch-fetch thumbnails and years (max ~50 per request to keep URL short)
+        # Batch-fetch thumbnails and years (small batches + retry on 202 queued)
         details_map: Dict[str, Dict[str, Any]] = {}
         ids = [e["bgg_id"] for e in exp_links if e["bgg_id"]]
-        for i in range(0, len(ids), 50):
-            batch = ids[i:i + 50]
-            r2 = await client.get(f"{BGG_BASE}/thing", params={"id": ",".join(batch)})
-            if r2.status_code != 200:
+        for i in range(0, len(ids), 20):
+            batch = ids[i:i + 20]
+            # BGG may return HTTP 202 "queued" — retry up to 4 times with backoff
+            r2 = None
+            for attempt in range(4):
+                r2 = await client.get(f"{BGG_BASE}/thing", params={"id": ",".join(batch)})
+                if r2.status_code == 200:
+                    break
+                if r2.status_code == 202:
+                    await asyncio.sleep(1.5 + attempt * 1.5)
+                    continue
+                logger.warning("BGG /thing batch returned %s for ids=%s", r2.status_code, batch[:3])
+                break
+            if r2 is None or r2.status_code != 200:
                 continue
-            root2 = ET.fromstring(r2.text)
+            try:
+                root2 = ET.fromstring(r2.text)
+            except ET.ParseError:
+                continue
             for it in root2.findall("item"):
                 bid = it.attrib.get("id", "")
                 thumb_el = it.find("thumbnail")
