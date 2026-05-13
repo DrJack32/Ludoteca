@@ -1496,6 +1496,7 @@ function App() {
     });
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
 
     const handleSearchChange = (e) => {
       const { name, value } = e.target;
@@ -1522,6 +1523,7 @@ function App() {
 
         const response = await axios.post(`${API}/games/search`, filters);
         setSearchResults(response.data);
+        setViewMode('list');
       } catch (error) {
         console.error('Error searching games:', error);
         alert('Error al buscar juegos');
@@ -1676,6 +1678,7 @@ function App() {
                     type="button"
                     onClick={() => {
                       setSearchResults(games);
+                      setViewMode('grid');
                     }}
                     className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-105"
                   >
@@ -1688,10 +1691,96 @@ function App() {
             {/* Search Results */}
             {searchResults.length > 0 && (
               <div className="bg-white rounded-2xl shadow-xl p-8">
-                <h2 className="text-2xl font-bold text-purple-800 mb-6">
-                  📋 Resultados ({searchResults.length} juegos encontrados)
-                </h2>
-                <div className="grid gap-4">
+                <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+                  <h2 className="text-2xl font-bold text-purple-800">
+                    📋 Resultados ({searchResults.length} juegos)
+                  </h2>
+                  <div className="inline-flex rounded-lg overflow-hidden border-2 border-purple-300" data-testid="view-mode-toggle">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('grid')}
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${viewMode === 'grid' ? 'bg-purple-600 text-white' : 'bg-white text-purple-700 hover:bg-purple-50'}`}
+                      data-testid="view-mode-grid"
+                    >
+                      🗂️ Cuadrícula
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-purple-600 text-white' : 'bg-white text-purple-700 hover:bg-purple-50'}`}
+                      data-testid="view-mode-list"
+                    >
+                      📋 Detalle
+                    </button>
+                  </div>
+                </div>
+
+                {viewMode === 'grid' ? (
+                  /* ---------- GRID VIEW: compact cards ---------- */
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" data-testid="games-grid">
+                    {[...searchResults].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')).map(game => (
+                      <button
+                        key={game.id}
+                        onClick={() => {
+                          setEditingGame(game);
+                          setCurrentView('edit');
+                        }}
+                        className="bg-white border-2 border-purple-100 hover:border-purple-500 hover:shadow-lg rounded-xl overflow-hidden transition-all text-left flex flex-col"
+                        data-testid={`grid-card-${game.id}`}
+                      >
+                        <div className="aspect-square bg-purple-50 flex items-center justify-center overflow-hidden">
+                          {game.imagen ? (
+                            <img
+                              src={game.imagen}
+                              alt={game.nombre}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="text-5xl opacity-40">🎲</span>
+                          )}
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col gap-1">
+                          <h3 className="font-semibold text-purple-900 text-sm leading-tight line-clamp-2 mb-1" title={game.nombre}>
+                            {game.nombre}
+                          </h3>
+                          <div className="text-xs text-gray-600 space-y-0.5 mt-auto">
+                            {(game.jugadores_minimo || game.jugadores_maximo) && (
+                              <div className="flex items-center gap-1">
+                                <span>👥</span>
+                                <span>{game.jugadores_minimo || '?'}–{game.jugadores_maximo || '?'}</span>
+                              </div>
+                            )}
+                            {(game.duracion_minima || game.duracion_maxima) && (
+                              <div className="flex items-center gap-1">
+                                <span>⏱️</span>
+                                <span>
+                                  {game.duracion_minima && game.duracion_maxima
+                                    ? `${Math.round((game.duracion_minima + game.duracion_maxima) / 2)} min`
+                                    : `${game.duracion_minima || game.duracion_maxima} min`}
+                                </span>
+                              </div>
+                            )}
+                            {game.idioma && (
+                              <div className="flex items-center gap-1">
+                                <span>🌐</span>
+                                <span className="truncate">{game.idioma}</span>
+                              </div>
+                            )}
+                            {game.expansiones && game.expansiones.length > 0 && (
+                              <div className="flex items-center gap-1 text-purple-600 font-medium">
+                                <span>📦</span>
+                                <span>{game.expansiones.length} expansiones</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* ---------- LIST VIEW: full detail ---------- */
+                  <div className="grid gap-4">
                   {searchResults.map(game => (
                     <div key={game.id} className="game-card">
                       <div className="flex items-start space-x-4">
@@ -1781,6 +1870,7 @@ function App() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
           </div>
