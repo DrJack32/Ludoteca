@@ -27,11 +27,12 @@ jobs:
 
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
       - name: Instalar dependencias del frontend
         working-directory: ./frontend
-        run: |
-          yarn install --frozen-lockfile
+        run: yarn install --network-timeout 600000
 
       - name: Crear archivo .env de produccion
         working-directory: ./frontend
@@ -42,6 +43,8 @@ jobs:
         working-directory: ./frontend
         env:
           CI: false
+          GENERATE_SOURCEMAP: false
+          NODE_OPTIONS: --max-old-space-size=4096
         run: yarn build
 
       - name: Sincronizar Capacitor con Android
@@ -52,14 +55,19 @@ jobs:
         working-directory: ./frontend/android
         run: chmod +x gradlew
 
-      - name: Compilar APK (debug, listo para instalar)
+      - name: Mostrar version de gradle (debug)
         working-directory: ./frontend/android
-        run: ./gradlew assembleDebug
+        run: ./gradlew --version
+
+      - name: Compilar APK debug
+        working-directory: ./frontend/android
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Renombrar APK
         run: |
           mkdir -p apk-output
           cp frontend/android/app/build/outputs/apk/debug/app-debug.apk apk-output/mi-ludoteca.apk
+          ls -lh apk-output/
 
       - name: Subir APK como artefacto descargable
         uses: actions/upload-artifact@v4
