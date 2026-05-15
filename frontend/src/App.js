@@ -294,6 +294,8 @@ function App() {
           duracion_minima: d.duracion_minima ? String(d.duracion_minima) : prev.duracion_minima,
           duracion_maxima: d.duracion_maxima ? String(d.duracion_maxima) : prev.duracion_maxima,
           complejidad: d.complejidad ? String(d.complejidad) : prev.complejidad,
+          // Reemplaza la foto del usuario por la portada oficial de BGG (mucho mejor calidad)
+          imagen: d.imagen || prev.imagen,
         }));
         setIaStatus('done');
         setIaCandidates([]);
@@ -471,8 +473,11 @@ function App() {
               {iaStatus === 'done' && (
                 <div className="text-center py-6" data-testid="ia-status-done">
                   <div className="text-5xl mb-3">✅</div>
-                  <p className="text-green-700 font-semibold mb-4">¡Datos rellenados automáticamente!</p>
-                  <p className="text-sm text-gray-600 mb-4">Revisa los campos y completa la ubicación.</p>
+                  <p className="text-green-700 font-semibold mb-2">¡Datos rellenados automáticamente!</p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Se ha usado la portada oficial de BGG en lugar de tu foto.<br />
+                    Revisa los campos y completa la ubicación.
+                  </p>
                   <button onClick={cancelIa} className="btn-primary" data-testid="ia-done-btn">
                     Perfecto, continuar
                   </button>
