@@ -1886,25 +1886,40 @@ function App() {
     const [confirmFile, setConfirmFile] = useState(null);
     const [restoreMode, setRestoreMode] = useState('reemplazar');
     const [message, setMessage] = useState(null);
+    const [manualDownload, setManualDownload] = useState(null); // { url, filename }
 
     const downloadBackup = async () => {
       setDownloading(true);
       setMessage(null);
+      setManualDownload(null);
       try {
         const res = await axios.get(`${API}/backup`);
         const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
         const date = new Date().toISOString().slice(0, 10);
-        a.href = url;
-        a.download = `mi-ludoteca-backup-${date}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setMessage({ type: 'success', text: `✅ Backup descargado (${res.data.total_juegos} juegos).` });
+        const filename = `mi-ludoteca-backup-${date}.json`;
+
+        // Try programmatic download first
+        try {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.rel = 'noopener';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } catch (e) {
+          // Will fall through to manual link below
+        }
+
+        // Always show a manual link as fallback (iframes/preview block auto-download)
+        setManualDownload({ url, filename });
+        setMessage({
+          type: 'success',
+          text: `✅ Backup listo (${res.data.total_juegos} juegos). Si no se ha descargado automáticamente, pulsa el enlace de abajo.`,
+        });
       } catch (err) {
-        setMessage({ type: 'error', text: '❌ Error al descargar el backup.' });
+        setMessage({ type: 'error', text: '❌ Error al generar el backup: ' + (err.response?.data?.detail || err.message) });
       } finally {
         setDownloading(false);
       }
@@ -1999,6 +2014,23 @@ function App() {
             data-testid="backup-message"
           >
             {message.text}
+            {manualDownload && (
+              <div className="mt-2">
+                <a
+                  href={manualDownload.url}
+                  download={manualDownload.filename}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg text-sm"
+                  data-testid="backup-manual-link"
+                >
+                  📥 Descargar {manualDownload.filename}
+                </a>
+                <p className="text-xs text-gray-600 mt-2">
+                  Si el botón abre el archivo en otra pestaña en lugar de descargar, haz clic derecho → "Guardar enlace como…"
+                </p>
+              </div>
+            )}
           </div>
         )}
 
