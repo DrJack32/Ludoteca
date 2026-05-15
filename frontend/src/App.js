@@ -1465,23 +1465,51 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditingGame(null);
-                    setCurrentView('search');
+                  onClick={async () => {
+                    if (!editingGame) return;
+                    const confirmed = window.confirm(
+                      `⚠️ ¿Eliminar "${editingGame.nombre}" definitivamente?\n\nEsta acción no se puede deshacer. Si tienes un backup reciente podrás restaurarlo.`
+                    );
+                    if (!confirmed) return;
+                    try {
+                      await axios.delete(`${API}/games/${editingGame.id}`);
+                      alert('🗑️ Juego eliminado correctamente.');
+                      fetchGames();
+                      fetchAutocompleteData();
+                      setEditingGame(null);
+                      setCurrentView('home');
+                    } catch (err) {
+                      console.error('Error deleting game:', err);
+                      alert('Error al eliminar el juego.');
+                    }
                   }}
-                  className="btn-secondary"
+                  className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+                  data-testid="edit-delete-btn"
                 >
-                  Cancelar
+                  🗑️ Eliminar juego
                 </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                >
-                  💾 Actualizar Juego
-                </button>
+
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingGame(null);
+                      setCurrentView('search');
+                    }}
+                    className="btn-secondary"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                  >
+                    💾 Actualizar Juego
+                  </button>
+                </div>
               </div>
             </form>
           </div>
