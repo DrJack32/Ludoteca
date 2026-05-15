@@ -55,9 +55,23 @@ jobs:
         working-directory: ./frontend/android
         run: chmod +x gradlew
 
+      - name: Regenerar gradle-wrapper.jar si falta
+        working-directory: ./frontend/android
+        run: |
+          if [ ! -s gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle-wrapper.jar no presente, descargando..."
+            GRADLE_VERSION=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties | sed -E 's/.*gradle-([0-9.]+).*/\1/')
+            echo "Detectada gradle version: $GRADLE_VERSION"
+            curl -sL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip
+            unzip -q /tmp/gradle.zip -d /tmp
+            /tmp/gradle-${GRADLE_VERSION}/bin/gradle wrapper --gradle-version ${GRADLE_VERSION} --no-daemon
+            rm -rf /tmp/gradle.zip /tmp/gradle-${GRADLE_VERSION}
+          fi
+          ls -lh gradle/wrapper/
+
       - name: Mostrar version de gradle (debug)
         working-directory: ./frontend/android
-        run: ./gradlew --version
+        run: ./gradlew --version --no-daemon
 
       - name: Compilar APK debug
         working-directory: ./frontend/android
