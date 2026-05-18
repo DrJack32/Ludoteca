@@ -835,6 +835,28 @@ function App() {
     const [expLinkResults, setExpLinkResults] = useState([]);
     const [expLinkSearching, setExpLinkSearching] = useState(false);
 
+    // Delete confirmation state
+    const [deleteConfirm, setDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    const performDelete = async () => {
+      if (!editingGame) return;
+      setDeleting(true);
+      try {
+        await axios.delete(`${API}/games/${editingGame.id}`);
+        setDeleting(false);
+        setDeleteConfirm(false);
+        fetchGames();
+        fetchAutocompleteData();
+        setEditingGame(null);
+        setCurrentView('home');
+      } catch (err) {
+        console.error('Error deleting game:', err);
+        setDeleting(false);
+        alert('Error al eliminar el juego: ' + (err.response?.data?.detail || err.message));
+      }
+    };
+
     // Pre-populate form with existing game data
     useEffect(() => {
       if (editingGame) {
@@ -1468,24 +1490,7 @@ function App() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (!editingGame) return;
-                    const confirmed = window.confirm(
-                      `⚠️ ¿Eliminar "${editingGame.nombre}" definitivamente?\n\nEsta acción no se puede deshacer. Si tienes un backup reciente podrás restaurarlo.`
-                    );
-                    if (!confirmed) return;
-                    try {
-                      await axios.delete(`${API}/games/${editingGame.id}`);
-                      alert('🗑️ Juego eliminado correctamente.');
-                      fetchGames();
-                      fetchAutocompleteData();
-                      setEditingGame(null);
-                      setCurrentView('home');
-                    } catch (err) {
-                      console.error('Error deleting game:', err);
-                      alert('Error al eliminar el juego.');
-                    }
-                  }}
+                  onClick={() => setDeleteConfirm(true)}
                   className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
                   data-testid="edit-delete-btn"
                 >
@@ -1511,6 +1516,44 @@ function App() {
                   </button>
                 </div>
               </div>
+
+              {/* Delete confirmation modal */}
+              {deleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" data-testid="delete-confirm-modal">
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                    <div className="text-center mb-4">
+                      <div className="text-5xl mb-3">⚠️</div>
+                      <h3 className="text-2xl font-bold text-red-700 mb-2">¿Eliminar este juego?</h3>
+                      <p className="text-gray-700">
+                        Se borrará <span className="font-semibold">"{editingGame?.nombre}"</span> de tu ludoteca de forma permanente.
+                      </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Si tienes un backup reciente podrás restaurarlo desde Estadísticas.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirm(false)}
+                        disabled={deleting}
+                        className="btn-secondary flex-1"
+                        data-testid="delete-cancel-btn"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={performDelete}
+                        disabled={deleting}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all disabled:opacity-60"
+                        data-testid="delete-confirm-btn"
+                      >
+                        {deleting ? '⏳ Eliminando…' : '🗑️ Sí, eliminar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </form>
           </div>
         </div>
@@ -2141,12 +2184,43 @@ function App() {
 
   // Statistics Screen
   const StatisticsScreen = () => {
+    const [loadError, setLoadError] = useState(null);
+
+    useEffect(() => {
+      let cancelled = false;
+      setLoadError(null);
+      axios.get(`${API}/statistics`)
+        .then(res => { if (!cancelled) setStatistics(res.data); })
+        .catch(err => {
+          console.error('Error fetching statistics:', err);
+          if (!cancelled) setLoadError(err.response?.data?.detail || err.message || 'Error desconocido');
+        });
+      return () => { cancelled = true; };
+    }, []);
+
+    if (loadError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-red-700 mb-2">No se pudieron cargar las estadísticas</h2>
+            <p className="text-sm text-gray-600 mb-4 break-words">{String(loadError)}</p>
+            <div className="flex gap-2 justify-center">
+              <button onClick={() => window.location.reload()} className="btn-primary">🔄 Reintentar</button>
+              <button onClick={() => setCurrentView('home')} className="btn-secondary">← Volver al Inicio</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (!statistics) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-4xl mb-4">🔄</div>
+            <div className="text-4xl mb-4 animate-spin">🔄</div>
             <p className="text-xl text-purple-600">Cargando estadísticas...</p>
+            <button onClick={() => setCurrentView('home')} className="btn-secondary mt-6">← Volver al Inicio</button>
           </div>
         </div>
       );
