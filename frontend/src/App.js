@@ -108,7 +108,48 @@ function App() {
   };
 
   // Home Screen
-  const HomeScreen = () => (
+  const HomeScreen = () => {
+    const [recReq, setRecReq] = useState({ jugadores: 4, tiempo_max: 60, complejidad: null, categoria: '' });
+    const [recommendations, setRecommendations] = useState(null);
+    const [recLoading, setRecLoading] = useState(false);
+    const [recError, setRecError] = useState('');
+
+    const fetchRecommendations = async () => {
+      setRecLoading(true);
+      setRecError('');
+      setRecommendations(null);
+      try {
+        const payload = {
+          jugadores: recReq.jugadores ?? null,
+          tiempo_max: recReq.tiempo_max ?? null,
+          complejidad: recReq.complejidad ?? null,
+          categoria: recReq.categoria || null,
+          limit: 6,
+        };
+        const res = await axios.post(`${API}/recommend`, payload);
+        setRecommendations(res.data || []);
+      } catch (err) {
+        console.error('Recommend error:', err);
+        setRecError(err.response?.data?.detail || 'Error al obtener recomendaciones.');
+      } finally {
+        setRecLoading(false);
+      }
+    };
+
+    const timeChips = [
+      { label: 'Sin límite', value: null },
+      { label: '≤ 30 min', value: 30 },
+      { label: '≤ 60 min', value: 60 },
+      { label: '≤ 90 min', value: 90 },
+      { label: '≤ 3 h', value: 180 },
+    ];
+
+    const openGame = (g) => {
+      setEditingGame(g);
+      setCurrentView('edit');
+    };
+
+    return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 safe-area-top">
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-12">
@@ -125,6 +166,170 @@ function App() {
             <p className="text-sm text-green-600 mt-2">
               📱 Versión Móvil - Funciona sin conexión
             </p>
+          )}
+        </div>
+
+        {/* ---------- "Esta noche jugamos..." panel ---------- */}
+        <div className="max-w-4xl mx-auto mb-10 bg-white rounded-2xl shadow-xl p-6 md:p-8 border-2 border-purple-200" data-testid="tonight-panel">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-purple-800">🌙 Esta noche jugamos…</h2>
+              <p className="text-sm text-gray-600">Dinos cómo es la partida y te recomendamos los mejores juegos de tu colección.</p>
+            </div>
+          </div>
+
+          {/* Players stepper */}
+          <div className="grid md:grid-cols-2 gap-5 mb-5">
+            <div>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">👥 Jugadores</label>
+              <div className="flex items-center gap-3 bg-purple-50 rounded-xl p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setRecReq(r => ({ ...r, jugadores: Math.max(1, (r.jugadores || 1) - 1) }))}
+                  className="w-10 h-10 rounded-lg bg-purple-200 hover:bg-purple-300 text-purple-900 text-xl font-bold transition-colors"
+                  data-testid="rec-players-minus"
+                >−</button>
+                <span className="w-12 text-center font-bold text-2xl text-purple-900 tabular-nums" data-testid="rec-players-value">
+                  {recReq.jugadores ?? '-'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRecReq(r => ({ ...r, jugadores: Math.min(20, (r.jugadores || 0) + 1) }))}
+                  className="w-10 h-10 rounded-lg bg-purple-200 hover:bg-purple-300 text-purple-900 text-xl font-bold transition-colors"
+                  data-testid="rec-players-plus"
+                >+</button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">⏱️ Tiempo disponible</label>
+              <div className="flex flex-wrap gap-2">
+                {timeChips.map(c => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => setRecReq(r => ({ ...r, tiempo_max: c.value }))}
+                    className={`px-3 py-2 rounded-full text-sm font-medium border-2 transition-all ${
+                      recReq.tiempo_max === c.value
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'
+                    }`}
+                    data-testid={`rec-time-${c.value ?? 'none'}`}
+                  >{c.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 mb-5">
+            <div>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">🧠 Complejidad</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setRecReq(r => ({ ...r, complejidad: r.complejidad === n ? null : n }))}
+                    className={`flex-1 py-2 rounded-lg font-semibold border-2 transition-all ${
+                      recReq.complejidad === n
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'
+                    }`}
+                    data-testid={`rec-complexity-${n}`}
+                  >{n}</button>
+                ))}
+                {recReq.complejidad !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setRecReq(r => ({ ...r, complejidad: null }))}
+                    className="px-3 py-2 text-sm text-gray-500 hover:text-red-600"
+                    data-testid="rec-complexity-clear"
+                  >limpiar</button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">🏷️ Categoría (opcional)</label>
+              <input
+                type="text"
+                list="rec-categories"
+                value={recReq.categoria}
+                onChange={(e) => setRecReq(r => ({ ...r, categoria: e.target.value }))}
+                placeholder="ej. Estrategia, Familiar, Cartas…"
+                className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-500"
+                data-testid="rec-category-input"
+              />
+              <datalist id="rec-categories">
+                {(autocompleteData?.categorias || []).map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={fetchRecommendations}
+              disabled={recLoading || games.length === 0}
+              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              data-testid="rec-submit-btn"
+            >
+              {recLoading ? '🎲 Pensando…' : '🎲 Recomendar juegos'}
+            </button>
+          </div>
+
+          {recError && (
+            <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-800 rounded">
+              ⚠️ {recError}
+            </div>
+          )}
+
+          {/* Results */}
+          {recommendations && recommendations.length === 0 && (
+            <div className="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 rounded">
+              😅 No hay juegos en tu colección que encajen con esos criterios. Prueba a relajar algún filtro.
+            </div>
+          )}
+
+          {recommendations && recommendations.length > 0 && (
+            <div className="mt-6" data-testid="rec-results">
+              <h3 className="text-lg font-bold text-purple-800 mb-3">🏆 Top recomendaciones ({recommendations.length})</h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recommendations.map(r => (
+                  <button
+                    key={r.juego.id}
+                    onClick={() => openGame(r.juego)}
+                    className="bg-white border-2 border-purple-100 hover:border-purple-500 hover:shadow-xl rounded-xl overflow-hidden text-left transition-all"
+                    data-testid={`rec-card-${r.juego.id}`}
+                  >
+                    <div className="relative">
+                      <div className="aspect-[4/3] bg-purple-50 overflow-hidden">
+                        {r.juego.imagen ? (
+                          <img src={r.juego.imagen} alt={r.juego.nombre} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-5xl opacity-40">🎲</div>
+                        )}
+                      </div>
+                      <div className={`absolute top-2 right-2 px-3 py-1 rounded-full font-bold text-sm shadow-md ${
+                        r.score >= 80 ? 'bg-green-500 text-white'
+                        : r.score >= 60 ? 'bg-yellow-500 text-white'
+                        : 'bg-gray-400 text-white'
+                      }`} data-testid={`rec-score-${r.juego.id}`}>
+                        {r.score}
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <h4 className="font-bold text-purple-900 truncate mb-2" title={r.juego.nombre}>{r.juego.nombre}</h4>
+                      <ul className="space-y-1 text-xs text-gray-700">
+                        {r.razones.slice(0, 3).map((rz, i) => (
+                          <li key={i} className="leading-snug">{rz}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -173,7 +378,8 @@ function App() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   // Add Game Screen
   const AddGameScreen = () => {

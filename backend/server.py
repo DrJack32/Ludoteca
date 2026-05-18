@@ -528,6 +528,133 @@ async def restore_backup(req: RestoreRequest):
     )
 
 
+# ---------- Recommendation engine ----------
+class RecommendRequest(BaseModel):
+    jugadores: Optional[int] = None
+    tiempo_max: Optional[int] = None  # minutos, None = sin límite
+    complejidad: Optional[int] = None  # 1-5
+    categoria: Optional[str] = None
+    limit: int = 6
+
+
+class Recommendation(BaseModel):
+    juego: Game
+    score: int
+    razones: List[str]
+
+
+def _score_game(g: dict, req: RecommendRequest):
+    """Compute a 0-100 score and a list of human-readable Spanish reasons."""
+    razones: List[str] = []
+    score = 0.0
+    max_score = 0.0
+
+    # 1) Player fit (weight 40)
+    if req.jugadores is not None:
+        max_score += 40
+        gmin = g.get("jugadores_minimo")
+        gmax = g.get("jugadores_maximo")
+        if gmin and gmax:
+            if gmin <= req.jugadores <= gmax:
+                sweet = (gmin + gmax) / 2.0
+                spread = max(gmax - gmin, 1)
+                dist = abs(req.jugadores - sweet) / (spread / 2.0)
+                pf = 40 * (1 - 0.25 * dist)
+                score += pf
+                if req.jugadores == round(sweet):
+                    razones.append(f"🎯 Punto óptimo para {req.jugadores} jugadores")
+                else:
+                    razones.append(f"✅ Bueno para {req.jugadores} jugadores (rango {gmin}–{gmax})")
+            else:
+                diff = min(abs(req.jugadores - gmin), abs(req.jugadores - gmax))
+                pf = max(0, 40 - 15 * diff)
+                score += pf
+                razones.append(f"⚠️ Pensado para {gmin}–{gmax} jugadores")
+        elif gmin:
+            if req.jugadores >= gmin:
+                score += 30
+                razones.append(f"Mínimo {gmin} jugadores")
+
+    # 2) Complexity fit (weight 25)
+    if req.complejidad is not None and g.get("complejidad"):
+        max_score += 25
+        diff = abs(g["complejidad"] - req.complejidad)
+        cf = max(0, 25 - 8 * diff)
+        score += cf
+        if diff == 0:
+            razones.append(f"🧠 Complejidad ideal ({g['complejidad']}/5)")
+        elif diff == 1:
+            razones.append(f"🧠 Complejidad cercana ({g['complejidad']}/5 vs {req.complejidad}/5)")
+        else:
+            razones.append(f"🧠 Complejidad {g['complejidad']}/5 (buscabas {req.complejidad}/5)")
+
+    # 3) Time fit (weight 25)
+    if req.tiempo_max is not None:
+        max_score += 25
+        dmin = g.get("duracion_minima")
+        dmax = g.get("duracion_maxima") or dmin
+        if dmax:
+            if dmax <= req.tiempo_max:
+                usage = dmax / req.tiempo_max
+                tf = 18 + 7 * usage
+                score += tf
+                if dmin and dmax and dmin != dmax:
+                    razones.append(f"⏱️ Cabe en {req.tiempo_max} min ({dmin}–{dmax} min)")
+                else:
+                    razones.append(f"⏱️ {dmax} min, dentro del tiempo disponible")
+            else:
+                overflow_pct = (dmax - req.tiempo_max) / req.tiempo_max
+                tf = max(0, 25 * (1 - overflow_pct))
+                score += tf
+                razones.append(f"⚠️ Algo largo ({dmax} min, buscabas ≤{req.tiempo_max})")
+
+    # 4) Category match (weight 10)
+    if req.categoria and g.get("categoria"):
+        max_score += 10
+        if req.categoria.lower() in g["categoria"].lower():
+            score += 10
+            razones.append(f"🏷️ Categoría: {g['categoria']}")
+
+    if max_score == 0:
+        final = 50
+    else:
+        final = int(round(100 * score / max_score))
+    return final, razones
+
+
+@api_router.post("/recommend", response_model=List[Recommendation])
+async def recommend_games(req: RecommendRequest):
+    """Recomienda hasta `limit` juegos basados en jugadores, tiempo, complejidad y categoría."""
+    query: Dict[str, Any] = {}
+    if req.jugadores is not None:
+        query["jugadores_minimo"] = {"$lte": req.jugadores + 1}
+        query["jugadores_maximo"] = {"$gte": max(1, req.jugadores - 1)}
+    if req.categoria:
+        query["categoria"] = {"$regex": req.categoria, "$options": "i"}
+
+    games = await db.games.find(query, {"_id": 0}).to_list(2000)
+
+    scored = []
+    for g in games:
+        score, razones = _score_game(g, req)
+        if not razones:
+            razones = ["📚 Juego de tu colección"]
+        scored.append((score, g, razones))
+
+    scored.sort(key=lambda x: (x[0], 1 if x[1].get("imagen") else 0), reverse=True)
+    top = scored[: max(1, min(req.limit, 20))]
+
+    out: List[Recommendation] = []
+    for score, g, razones in top:
+        try:
+            out.append(Recommendation(juego=Game(**g), score=score, razones=razones))
+        except Exception:
+            continue
+    return out
+
+
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
