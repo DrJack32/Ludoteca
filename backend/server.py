@@ -627,8 +627,9 @@ async def recommend_games(req: RecommendRequest):
     """Recomienda hasta `limit` juegos basados en jugadores, tiempo, complejidad y categoría."""
     query: Dict[str, Any] = {}
     if req.jugadores is not None:
-        query["jugadores_minimo"] = {"$lte": req.jugadores + 1}
-        query["jugadores_maximo"] = {"$gte": max(1, req.jugadores - 1)}
+        # Coincidencia EXACTA: el juego debe soportar este número de jugadores
+        query["jugadores_minimo"] = {"$lte": req.jugadores}
+        query["jugadores_maximo"] = {"$gte": req.jugadores}
     if req.categoria:
         query["categoria"] = {"$regex": req.categoria, "$options": "i"}
 

@@ -169,6 +169,50 @@ function App() {
           )}
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto mb-10">
+          <button
+            onClick={() => setCurrentView('add')}
+            className="nav-button bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+          >
+            <div className="text-4xl mb-3">➕</div>
+            <h3 className="text-xl font-semibold mb-2">Añadir Juego</h3>
+            <p className="text-sm opacity-90">Agregar un nuevo juego a tu colección</p>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('search')}
+            className="nav-button bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
+          >
+            <div className="text-4xl mb-3">🔍</div>
+            <h3 className="text-xl font-semibold mb-2">Buscar</h3>
+            <p className="text-sm opacity-90">Encontrar juegos por diversos criterios</p>
+          </button>
+
+          <button
+            onClick={() => {
+              setCurrentView('statistics');
+              fetchStatistics();
+            }}
+            className="nav-button bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700"
+          >
+            <div className="text-4xl mb-3">📊</div>
+            <h3 className="text-xl font-semibold mb-2">Estadísticas</h3>
+            <p className="text-sm opacity-90">Ver análisis de tu colección</p>
+          </button>
+
+          <button
+            onClick={() => {
+              setCurrentView('locations');
+              fetchLocations();
+            }}
+            className="nav-button bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+          >
+            <div className="text-4xl mb-3">📍</div>
+            <h3 className="text-xl font-semibold mb-2">Ubicaciones</h3>
+            <p className="text-sm opacity-90">Gestionar ubicaciones físicas</p>
+          </button>
+        </div>
+
         {/* ---------- "Esta noche jugamos..." panel ---------- */}
         <div className="max-w-4xl mx-auto mb-10 bg-white rounded-2xl shadow-xl p-6 md:p-8 border-2 border-purple-200" data-testid="tonight-panel">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
@@ -331,50 +375,6 @@ function App() {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto">
-          <button
-            onClick={() => setCurrentView('add')}
-            className="nav-button bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-          >
-            <div className="text-4xl mb-3">➕</div>
-            <h3 className="text-xl font-semibold mb-2">Añadir Juego</h3>
-            <p className="text-sm opacity-90">Agregar un nuevo juego a tu colección</p>
-          </button>
-
-          <button
-            onClick={() => setCurrentView('search')}
-            className="nav-button bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
-          >
-            <div className="text-4xl mb-3">🔍</div>
-            <h3 className="text-xl font-semibold mb-2">Buscar</h3>
-            <p className="text-sm opacity-90">Encontrar juegos por diversos criterios</p>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('statistics');
-              fetchStatistics();
-            }}
-            className="nav-button bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700"
-          >
-            <div className="text-4xl mb-3">📊</div>
-            <h3 className="text-xl font-semibold mb-2">Estadísticas</h3>
-            <p className="text-sm opacity-90">Ver análisis de tu colección</p>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentView('locations');
-              fetchLocations();
-            }}
-            className="nav-button bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
-          >
-            <div className="text-4xl mb-3">📍</div>
-            <h3 className="text-xl font-semibold mb-2">Ubicaciones</h3>
-            <p className="text-sm opacity-90">Gestionar ubicaciones físicas</p>
-          </button>
         </div>
       </div>
     </div>
