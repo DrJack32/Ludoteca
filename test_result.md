@@ -225,28 +225,65 @@ backend:
         agent: "testing"
         comment: "Locations endpoint returns organized location data grouped by shelf and shelf position, with game counts and lists for each location."
 
+  - task: "AI Game Identification (POST /api/identify-game)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py, /app/backend/game_identifier.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported: 'La identificación con IA resulta en: Error al identificar el juego con IA'"
+      - working: true
+        agent: "main"
+        comment: "Fixed import error: changed 'from backend.game_identifier' to 'from game_identifier' in server.py. Also recreated missing .env files with MONGO_URL, DB_NAME, and EMERGENT_LLM_KEY."
+      - working: true
+        agent: "testing"
+        comment: "✅ AI identification endpoint is working correctly. Tested with both raw base64 and data URL prefix formats. Returns 200 OK with proper JSON structure {titulos: [], codigo_barras: null}. GPT-4o vision is responding correctly via emergentintegrations. The user-reported error 'Error al identificar el juego con IA' is RESOLVED."
+
+  - task: "BGG Search (GET /api/bgg/search)"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py, /app/backend/game_identifier.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "BGG search endpoint returns 200 OK but BGG API returns 401 Unauthorized. This is a BoardGameGeek API authentication issue, not a code issue. BGG API may require authentication token or has changed their API access requirements. Backend logs show: 'BGG search returned 401'. Direct curl test confirms: 'Unauthorized. See https://boardgamegeek.com/using_the_xml_api'"
+
+  - task: "BGG Details (GET /api/bgg/details/{bgg_id})"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py, /app/backend/game_identifier.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "BGG details endpoint returns 404 because BGG API is returning 401 Unauthorized (same issue as BGG search). This is a BoardGameGeek API authentication issue, not a code issue. The endpoint code is correct but BGG API requires proper authentication."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "API Health Check"
-    - "Game Creation (POST /api/games)"
-    - "Get All Games (GET /api/games)"
-    - "Get Specific Game (GET /api/games/{game_id})"
-    - "Update Game (PUT /api/games/{game_id})"
-    - "Delete Game (DELETE /api/games/{game_id})"
-    - "Search Games (POST /api/games/search)"
-    - "Statistics (GET /api/statistics)"
-    - "Autocomplete Data (GET /api/autocomplete)"
-    - "Locations (GET /api/locations)"
+    - "AI Game Identification (POST /api/identify-game)"
+    - "BGG Search (GET /api/bgg/search)"
+    - "BGG Details (GET /api/bgg/details/{bgg_id})"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "testing"
     message: "I've completed comprehensive testing of all the board game library management API endpoints. All endpoints are working correctly with proper error handling. The API successfully handles Spanish game data and all CRUD operations, search functionality, statistics, autocomplete, and location data retrieval work as expected."
+  - agent: "testing"
+    message: "Completed testing of AI identification and BGG endpoints. MAIN ISSUE RESOLVED: The AI identification endpoint (POST /api/identify-game) is now working correctly - the user-reported error 'Error al identificar el juego con IA' is fixed. The endpoint returns 200 OK with proper JSON structure and GPT-4o vision is responding correctly. BGG endpoints (search and details) are failing due to BoardGameGeek API returning 401 Unauthorized - this is an external API authentication issue, not a code issue. The BGG API may require authentication tokens or has changed their access requirements."

@@ -16,7 +16,7 @@ import re
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from backend.game_identifier import (
+from game_identifier import (
     identify_game_from_image,
     bgg_search,
     bgg_get_details,

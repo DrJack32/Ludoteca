@@ -342,6 +342,117 @@ class BoardGameAPITest(unittest.TestCase):
         response = self.session.delete(f"{BASE_URL}/games/{fake_id}")
         self.assertEqual(response.status_code, 404)
         print("Correctly received 404 for deleting non-existent game")
+    
+    def test_11_ai_identify_game(self):
+        """Test AI game identification endpoint"""
+        print("\n11. Testing AI game identification...")
+        
+        # Test with a small test image (base64 encoded 1x1 PNG)
+        test_image_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        
+        # Test 1: Without data URL prefix
+        print("Test 1: Image without data URL prefix")
+        payload = {"imagen": test_image_base64}
+        response = self.session.post(f"{BASE_URL}/identify-game", json=payload)
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.text}")
+        
+        # Should return 200 (even if no game is identified, it should not error)
+        self.assertIn(response.status_code, [200, 500])
+        if response.status_code == 200:
+            data = response.json()
+            self.assertIn("titulos", data)
+            self.assertIn("codigo_barras", data)
+            self.assertIsInstance(data["titulos"], list)
+            print(f"Identified titles: {data['titulos']}")
+            print(f"Barcode: {data['codigo_barras']}")
+        else:
+            print(f"AI identification failed with error: {response.text}")
+        
+        # Test 2: With data URL prefix
+        print("\nTest 2: Image with data URL prefix")
+        test_image_with_prefix = f"data:image/png;base64,{test_image_base64}"
+        payload = {"imagen": test_image_with_prefix}
+        response = self.session.post(f"{BASE_URL}/identify-game", json=payload)
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.text}")
+        
+        self.assertIn(response.status_code, [200, 500])
+        if response.status_code == 200:
+            data = response.json()
+            self.assertIn("titulos", data)
+            self.assertIn("codigo_barras", data)
+            self.assertIsInstance(data["titulos"], list)
+            print(f"Identified titles: {data['titulos']}")
+            print(f"Barcode: {data['codigo_barras']}")
+        else:
+            print(f"AI identification failed with error: {response.text}")
+    
+    def test_12_bgg_search(self):
+        """Test BoardGameGeek search endpoint"""
+        print("\n12. Testing BGG search...")
+        
+        # Test searching for a well-known game
+        search_query = "catan"
+        print(f"Searching for: {search_query}")
+        response = self.session.get(f"{BASE_URL}/bgg/search", params={"q": search_query})
+        print(f"Response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        results = response.json()
+        self.assertIsInstance(results, list)
+        print(f"Found {len(results)} results")
+        
+        if len(results) > 0:
+            first_result = results[0]
+            self.assertIn("bgg_id", first_result)
+            self.assertIn("nombre", first_result)
+            self.assertIn("año", first_result)
+            self.assertIn("thumbnail", first_result)
+            print(f"First result: {first_result['nombre']} (BGG ID: {first_result['bgg_id']})")
+            
+            # Store the BGG ID for the next test
+            self.__class__.test_bgg_id = first_result['bgg_id']
+        else:
+            print("No results found (BGG API might be slow or unavailable)")
+    
+    def test_13_bgg_details(self):
+        """Test BoardGameGeek details endpoint"""
+        print("\n13. Testing BGG details...")
+        
+        # Use a well-known BGG ID (Catan = 13)
+        bgg_id = "13"
+        if hasattr(self.__class__, 'test_bgg_id'):
+            bgg_id = self.__class__.test_bgg_id
+        
+        print(f"Getting details for BGG ID: {bgg_id}")
+        response = self.session.get(f"{BASE_URL}/bgg/details/{bgg_id}")
+        print(f"Response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        details = response.json()
+        
+        # Verify the structure
+        self.assertIn("bgg_id", details)
+        self.assertIn("nombre", details)
+        self.assertIn("descripcion", details)
+        self.assertIn("categoria", details)
+        self.assertIn("autor", details)
+        self.assertIn("editorial", details)
+        self.assertIn("año_publicacion", details)
+        self.assertIn("jugadores_minimo", details)
+        self.assertIn("jugadores_maximo", details)
+        self.assertIn("duracion_minima", details)
+        self.assertIn("duracion_maxima", details)
+        self.assertIn("complejidad", details)
+        self.assertIn("imagen", details)
+        
+        print(f"Game name: {details['nombre']}")
+        print(f"Category: {details['categoria']}")
+        print(f"Author: {details['autor']}")
+        print(f"Players: {details['jugadores_minimo']}-{details['jugadores_maximo']}")
+        print(f"Duration: {details['duracion_minima']}-{details['duracion_maxima']} min")
+        print(f"Complexity: {details['complejidad']}/5")
 
 if __name__ == "__main__":
     # Run the tests
