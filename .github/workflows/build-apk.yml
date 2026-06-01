@@ -37,7 +37,7 @@ jobs:
       - name: Crear archivo .env de produccion
         working-directory: ./frontend
         run: |
-          echo "REACT_APP_BACKEND_URL=${{ secrets.REACT_APP_BACKEND_URL || 'https://ludoteca-board.preview.emergentagent.com' }}" > .env
+          echo "REACT_APP_BACKEND_URL=${{ secrets.REACT_APP_BACKEND_URL || 'https://repo-restore-9.preview.emergentagent.com' }}" > .env
 
       - name: Compilar build de React
         working-directory: ./frontend

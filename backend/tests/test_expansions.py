@@ -19,7 +19,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://ludoteca-board.preview.emergentagent.com"
+    "REACT_APP_BACKEND_URL", "https://repo-restore-9.preview.emergentagent.com"
 ).rstrip("/")
 
 BGG_TIMEOUT = 90  # batch fetch of thumbnails can take 10-30s

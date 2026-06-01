@@ -16,7 +16,7 @@ import pytest
 import requests
 from PIL import Image, ImageDraw, ImageFont
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://ludoteca-board.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://repo-restore-9.preview.emergentagent.com").rstrip("/")
 # OpenAI vision + BGG translation can be slow.
 LLM_TIMEOUT = 90
 BGG_TIMEOUT = 90

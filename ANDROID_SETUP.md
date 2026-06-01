@@ -96,7 +96,7 @@ Esto abre Android Studio con tu proyecto. Después: menú **Build → Build Bund
 Si no quieres compilar nada y aceptas pequeñas limitaciones (la cámara nativa de Capacitor no se usa, pero la web funciona perfectamente):
 
 1. Ve a **https://www.pwabuilder.com/**
-2. Pega la URL de tu app: `https://ludoteca-board.preview.emergentagent.com`
+2. Pega la URL de tu app: `https://repo-restore-9.preview.emergentagent.com`
 3. Pulsa **Start** → **Package For Stores → Android**.
 4. Descarga el `.apk` generado.
 

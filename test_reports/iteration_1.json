@@ -36,6 +36,6 @@
   "seed_data_creation": "Created and deleted a TEST_Catan_Regresion game during regression; cleanup performed in same suite (test_delete_game).",
   "retest_needed": false,
   "main_agent_can_self_test": true,
-  "context_for_next_testing_agent": "Backend AI+BGG endpoints fully verified end-to-end against the public URL https://ludoteca-board.preview.emergentagent.com. GPT-4o correctly identifies a synthetic CATAN image; BGG details for id=13 returns Spanish-translated name+description+category, Klaus Teuber as autor, año=1995, players 3-4, image URL. Invalid BGG id returns 404. Frontend AddGameScreen modal (App.js lines ~362-490) not yet tested — recommend Playwright run focused on: photo upload → runAIFlow → modal with top-5 candidates → selectBggCandidate fills form fields in Spanish.",
+  "context_for_next_testing_agent": "Backend AI+BGG endpoints fully verified end-to-end against the public URL https://repo-restore-9.preview.emergentagent.com. GPT-4o correctly identifies a synthetic CATAN image; BGG details for id=13 returns Spanish-translated name+description+category, Klaus Teuber as autor, año=1995, players 3-4, image URL. Invalid BGG id returns 404. Frontend AddGameScreen modal (App.js lines ~362-490) not yet tested — recommend Playwright run focused on: photo upload → runAIFlow → modal with top-5 candidates → selectBggCandidate fills form fields in Spanish.",
   "rca of the issue": "No bugs found."
 }
