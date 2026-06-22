@@ -8,6 +8,39 @@ import { useCapacitor } from "./hooks/useCapacitor";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Resize/compress an image data URL so it fits within OpenAI's payload limits
+// and reduces MongoDB document size. Returns a JPEG data URL.
+const resizeImageDataUrl = (dataUrl, maxSize = 1600, quality = 0.85) =>
+  new Promise((resolve, reject) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        const { width, height } = img;
+        if (width <= maxSize && height <= maxSize) {
+          // Still re-encode to JPEG to drop bloated PNG/HEIC payloads
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+          return;
+        }
+        const ratio = Math.min(maxSize / width, maxSize / height);
+        const w = Math.round(width * ratio);
+        const h = Math.round(height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      img.src = dataUrl;
+    } catch (e) {
+      reject(e);
+    }
+  });
+
 // Main App Component
 function App() {
   const [currentView, setCurrentView] = useState('home');
@@ -566,14 +599,21 @@ function App() {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (event) => {
-          const dataUrl = event.target.result;
-          setFormData(prev => ({
-            ...prev,
-            imagen: dataUrl
-          }));
-          // Auto-trigger AI identification
-          runAIFlow(dataUrl);
+        reader.onload = async (event) => {
+          try {
+            const resized = await resizeImageDataUrl(event.target.result);
+            setFormData(prev => ({
+              ...prev,
+              imagen: resized
+            }));
+            // Auto-trigger AI identification with the resized (lighter) image
+            runAIFlow(resized);
+          } catch (err) {
+            console.error('Resize error:', err);
+            // Fallback to original if resize fails
+            setFormData(prev => ({ ...prev, imagen: event.target.result }));
+            runAIFlow(event.target.result);
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -1246,11 +1286,20 @@ function App() {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (event) => {
-          setFormData(prev => ({
-            ...prev,
-            imagen: event.target.result
-          }));
+        reader.onload = async (event) => {
+          try {
+            const resized = await resizeImageDataUrl(event.target.result);
+            setFormData(prev => ({
+              ...prev,
+              imagen: resized
+            }));
+          } catch (err) {
+            console.error('Resize error:', err);
+            setFormData(prev => ({
+              ...prev,
+              imagen: event.target.result
+            }));
+          }
         };
         reader.readAsDataURL(file);
       }

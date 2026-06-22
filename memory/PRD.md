@@ -96,3 +96,6 @@ No auth configurada (app local de uso personal).
 
 ## Known issues
 Ninguno crítico. Latencia de BGG details + traducción ~15-25s en primera consulta de un juego (P1: cachear).
+
+## Bug fixes recientes (Feb 2026)
+- **Error "Unsupported image" en identificación con IA**: las imágenes subidas desde archivo eran demasiado grandes para el endpoint de GPT-4o vision. Fix: añadido helper `resizeImageDataUrl` en `App.js` que redimensiona la imagen a máx 1600px y reencoda a JPEG 0.85 antes de enviarla. Aplica también al guardado en MongoDB (menos espacio).
