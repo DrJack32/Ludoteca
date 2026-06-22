@@ -52,6 +52,8 @@ class Game(BaseModel):
     nombre: str
     descripcion: str = ""
     categoria: str = ""
+    subestilo: str = ""
+    interaccion: str = ""
     autor: str = ""
     editorial: str = ""
     año_publicacion: Optional[int] = None
@@ -75,6 +77,8 @@ class GameCreate(BaseModel):
     nombre: str
     descripcion: str = ""
     categoria: str = ""
+    subestilo: str = ""
+    interaccion: str = ""
     autor: str = ""
     editorial: str = ""
     año_publicacion: Optional[int] = None
@@ -96,6 +100,8 @@ class GameUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     categoria: Optional[str] = None
+    subestilo: Optional[str] = None
+    interaccion: Optional[str] = None
     autor: Optional[str] = None
     editorial: Optional[str] = None
     año_publicacion: Optional[int] = None
@@ -117,6 +123,8 @@ class SearchFilters(BaseModel):
     nombre: Optional[str] = None
     autor: Optional[str] = None
     categoria: Optional[str] = None
+    subestilo: Optional[str] = None
+    interaccion: Optional[str] = None
     año_publicacion: Optional[int] = None
     jugadores_minimo: Optional[int] = None
     jugadores_maximo: Optional[int] = None
