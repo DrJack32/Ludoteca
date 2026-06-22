@@ -142,11 +142,46 @@ class Statistics(BaseModel):
 
 class AutocompleteResponse(BaseModel):
     categorias: List[str]
+    subestilos: List[str]
+    interacciones: List[str]
     autores: List[str]
     editoriales: List[str]
     idiomas: List[str]
     ubicaciones_estanteria: List[str]
     ubicaciones_balda: List[str]
+
+
+# Default suggestions for the 3-tier categorization (used when DB has none yet)
+DEFAULT_CATEGORIAS = [
+    "Eurogame", "Familiar", "Party", "Estrategia", "Abstracto", "Sandbox",
+    "Wargame", "Colocación de trabajadores", "Filler", "Deckbuilding",
+    "Set collection", "Area control", "Push your luck", "Tile placement",
+    "Roll & write",
+]
+DEFAULT_SUBESTILOS = [
+    "Espacio", "Granja", "Mar", "Fantasía", "Medieval", "Ciencia ficción",
+    "Histórico", "Naturaleza", "Mitología", "Aventura", "Terror",
+    "Económico", "Guerra",
+]
+DEFAULT_INTERACCIONES = [
+    "Solitario", "Cooperativo", "Semi-cooperativo", "Competitivo directo",
+    "Competitivo indirecto", "Negociación", "Equipos", "Todos contra uno",
+]
+
+
+def _merge_sorted(db_values: List[str], defaults: List[str]) -> List[str]:
+    """Merge DB values with default suggestions, removing duplicates (case-insensitive), preserving DB first then defaults."""
+    seen = set()
+    merged: List[str] = []
+    for v in list(db_values) + list(defaults):
+        if not v:
+            continue
+        key = v.strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(v)
+    return sorted(merged, key=lambda s: s.lower())
 
 
 # Routes
@@ -223,6 +258,10 @@ async def search_games(filters: SearchFilters):
         query["autor"] = {"$regex": filters.autor, "$options": "i"}
     if filters.categoria:
         query["categoria"] = {"$regex": filters.categoria, "$options": "i"}
+    if filters.subestilo:
+        query["subestilo"] = {"$regex": filters.subestilo, "$options": "i"}
+    if filters.interaccion:
+        query["interaccion"] = {"$regex": filters.interaccion, "$options": "i"}
     if filters.año_publicacion:
         query["año_publicacion"] = filters.año_publicacion
     if filters.complejidad:
@@ -339,14 +378,18 @@ async def get_statistics():
 async def get_autocomplete_data():
     # Get unique values for autocomplete
     categorias = await db.games.distinct("categoria", {"categoria": {"$ne": ""}})
+    subestilos = await db.games.distinct("subestilo", {"subestilo": {"$ne": ""}})
+    interacciones = await db.games.distinct("interaccion", {"interaccion": {"$ne": ""}})
     autores = await db.games.distinct("autor", {"autor": {"$ne": ""}})
     editoriales = await db.games.distinct("editorial", {"editorial": {"$ne": ""}})
     idiomas = await db.games.distinct("idioma", {"idioma": {"$ne": ""}})
     ubicaciones_estanteria = await db.games.distinct("ubicacion_estanteria", {"ubicacion_estanteria": {"$ne": ""}})
     ubicaciones_balda = await db.games.distinct("ubicacion_balda", {"ubicacion_balda": {"$ne": ""}})
-    
+
     return AutocompleteResponse(
-        categorias=sorted(categorias),
+        categorias=_merge_sorted(categorias, DEFAULT_CATEGORIAS),
+        subestilos=_merge_sorted(subestilos, DEFAULT_SUBESTILOS),
+        interacciones=_merge_sorted(interacciones, DEFAULT_INTERACCIONES),
         autores=sorted(autores),
         editoriales=sorted(editoriales),
         idiomas=sorted(idiomas),
@@ -542,6 +585,8 @@ class RecommendRequest(BaseModel):
     tiempo_max: Optional[int] = None  # minutos, None = sin límite
     complejidad: Optional[int] = None  # 1-5
     categoria: Optional[str] = None
+    subestilo: Optional[str] = None
+    interaccion: Optional[str] = None
     limit: int = 6
 
 
@@ -621,7 +666,21 @@ def _score_game(g: dict, req: RecommendRequest):
         max_score += 10
         if req.categoria.lower() in g["categoria"].lower():
             score += 10
-            razones.append(f"🏷️ Categoría: {g['categoria']}")
+            razones.append(f"🏷️ Estilo: {g['categoria']}")
+
+    # 5) Subestilo (temática) match (weight 8)
+    if req.subestilo and g.get("subestilo"):
+        max_score += 8
+        if req.subestilo.lower() in g["subestilo"].lower():
+            score += 8
+            razones.append(f"🎨 Temática: {g['subestilo']}")
+
+    # 6) Interaction match (weight 8)
+    if req.interaccion and g.get("interaccion"):
+        max_score += 8
+        if req.interaccion.lower() in g["interaccion"].lower():
+            score += 8
+            razones.append(f"🤝 Interacción: {g['interaccion']}")
 
     if max_score == 0:
         final = 50
@@ -640,6 +699,10 @@ async def recommend_games(req: RecommendRequest):
         query["jugadores_maximo"] = {"$gte": req.jugadores}
     if req.categoria:
         query["categoria"] = {"$regex": req.categoria, "$options": "i"}
+    if req.subestilo:
+        query["subestilo"] = {"$regex": req.subestilo, "$options": "i"}
+    if req.interaccion:
+        query["interaccion"] = {"$regex": req.interaccion, "$options": "i"}
 
     games = await db.games.find(query, {"_id": 0}).to_list(2000)
 

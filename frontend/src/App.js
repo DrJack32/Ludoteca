@@ -109,7 +109,7 @@ function App() {
 
   // Home Screen
   const HomeScreen = () => {
-    const [recReq, setRecReq] = useState({ jugadores: 4, tiempo_max: 60, complejidad: null, categoria: '' });
+    const [recReq, setRecReq] = useState({ jugadores: 4, tiempo_max: 60, complejidad: null, categoria: '', subestilo: '', interaccion: '' });
     const [recommendations, setRecommendations] = useState(null);
     const [recLoading, setRecLoading] = useState(false);
     const [recError, setRecError] = useState('');
@@ -124,6 +124,8 @@ function App() {
           tiempo_max: recReq.tiempo_max ?? null,
           complejidad: recReq.complejidad ?? null,
           categoria: recReq.categoria || null,
+          subestilo: recReq.subestilo || null,
+          interaccion: recReq.interaccion || null,
           limit: 6,
         };
         const res = await axios.post(`${API}/recommend`, payload);
@@ -294,18 +296,51 @@ function App() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-purple-700 mb-2">🏷️ Categoría (opcional)</label>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">🏷️ Estilo de juego (opcional)</label>
               <input
                 type="text"
                 list="rec-categories"
                 value={recReq.categoria}
                 onChange={(e) => setRecReq(r => ({ ...r, categoria: e.target.value }))}
-                placeholder="ej. Estrategia, Familiar, Cartas…"
+                placeholder="ej. Estrategia, Familiar, Eurogame…"
                 className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-500"
                 data-testid="rec-category-input"
               />
               <datalist id="rec-categories">
                 {(autocompleteData?.categorias || []).map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 mb-5">
+            <div>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">🎨 Temática (opcional)</label>
+              <input
+                type="text"
+                list="rec-subestilos"
+                value={recReq.subestilo}
+                onChange={(e) => setRecReq(r => ({ ...r, subestilo: e.target.value }))}
+                placeholder="ej. Espacio, Granja, Fantasía…"
+                className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-500"
+                data-testid="rec-subestilo-input"
+              />
+              <datalist id="rec-subestilos">
+                {(autocompleteData?.subestilos || []).map(s => <option key={s} value={s} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-purple-700 mb-2">🤝 Interacción (opcional)</label>
+              <input
+                type="text"
+                list="rec-interacciones"
+                value={recReq.interaccion}
+                onChange={(e) => setRecReq(r => ({ ...r, interaccion: e.target.value }))}
+                placeholder="ej. Cooperativo, Competitivo directo…"
+                className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-500"
+                data-testid="rec-interaccion-input"
+              />
+              <datalist id="rec-interacciones">
+                {(autocompleteData?.interacciones || []).map(i => <option key={i} value={i} />)}
               </datalist>
             </div>
           </div>
@@ -387,6 +422,8 @@ function App() {
       nombre: '',
       descripcion: '',
       categoria: '',
+      subestilo: '',
+      interaccion: '',
       autor: '',
       editorial: '',
       año_publicacion: '',
@@ -725,7 +762,7 @@ function App() {
                     />
                   </div>
                   <div>
-                    <label className="form-label">Categoría</label>
+                    <label className="form-label">Estilo de juego</label>
                     <input
                       type="text"
                       name="categoria"
@@ -733,10 +770,45 @@ function App() {
                       onChange={handleInputChange}
                       className="form-input"
                       list="categorias"
+                      placeholder="ej. Eurogame, Familiar, Filler…"
                     />
                     <datalist id="categorias">
                       {autocompleteData.categorias?.map(cat => (
                         <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Temática</label>
+                    <input
+                      type="text"
+                      name="subestilo"
+                      value={formData.subestilo}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="subestilos"
+                      placeholder="ej. Espacio, Granja, Fantasía…"
+                    />
+                    <datalist id="subestilos">
+                      {autocompleteData.subestilos?.map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Interacción</label>
+                    <input
+                      type="text"
+                      name="interaccion"
+                      value={formData.interaccion}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="interacciones"
+                      placeholder="ej. Cooperativo, Competitivo directo…"
+                    />
+                    <datalist id="interacciones">
+                      {autocompleteData.interacciones?.map(i => (
+                        <option key={i} value={i} />
                       ))}
                     </datalist>
                   </div>
@@ -1014,6 +1086,8 @@ function App() {
       nombre: '',
       descripcion: '',
       categoria: '',
+      subestilo: '',
+      interaccion: '',
       autor: '',
       editorial: '',
       año_publicacion: '',
@@ -1070,6 +1144,8 @@ function App() {
           nombre: editingGame.nombre || '',
           descripcion: editingGame.descripcion || '',
           categoria: editingGame.categoria || '',
+          subestilo: editingGame.subestilo || '',
+          interaccion: editingGame.interaccion || '',
           autor: editingGame.autor || '',
           editorial: editingGame.editorial || '',
           año_publicacion: editingGame.año_publicacion ? editingGame.año_publicacion.toString() : '',
@@ -1275,7 +1351,7 @@ function App() {
                     />
                   </div>
                   <div>
-                    <label className="form-label">Categoría</label>
+                    <label className="form-label">Estilo de juego</label>
                     <input
                       type="text"
                       name="categoria"
@@ -1283,10 +1359,45 @@ function App() {
                       onChange={handleInputChange}
                       className="form-input"
                       list="categorias"
+                      placeholder="ej. Eurogame, Familiar, Filler…"
                     />
                     <datalist id="categorias">
                       {autocompleteData.categorias?.map(cat => (
                         <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Temática</label>
+                    <input
+                      type="text"
+                      name="subestilo"
+                      value={formData.subestilo}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="subestilos"
+                      placeholder="ej. Espacio, Granja, Fantasía…"
+                    />
+                    <datalist id="subestilos">
+                      {autocompleteData.subestilos?.map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Interacción</label>
+                    <input
+                      type="text"
+                      name="interaccion"
+                      value={formData.interaccion}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      list="interacciones"
+                      placeholder="ej. Cooperativo, Competitivo directo…"
+                    />
+                    <datalist id="interacciones">
+                      {autocompleteData.interacciones?.map(i => (
+                        <option key={i} value={i} />
                       ))}
                     </datalist>
                   </div>
@@ -1771,6 +1882,8 @@ function App() {
       nombre: '',
       autor: '',
       categoria: '',
+      subestilo: '',
+      interaccion: '',
       año_publicacion: '',
       jugadores_minimo: '',
       jugadores_maximo: '',
@@ -1819,6 +1932,8 @@ function App() {
         nombre: '',
         autor: '',
         categoria: '',
+        subestilo: '',
+        interaccion: '',
         año_publicacion: '',
         jugadores_minimo: '',
         jugadores_maximo: '',
@@ -1874,19 +1989,55 @@ function App() {
                     </datalist>
                   </div>
                   <div>
-                    <label className="form-label">Categoría</label>
+                    <label className="form-label">Estilo de juego</label>
                     <input
                       type="text"
                       name="categoria"
                       value={searchFilters.categoria}
                       onChange={handleSearchChange}
                       className="form-input"
-                      placeholder="Buscar por categoría..."
+                      placeholder="Buscar por estilo..."
                       list="search-categorias"
                     />
                     <datalist id="search-categorias">
                       {autocompleteData.categorias?.map(cat => (
                         <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Temática</label>
+                    <input
+                      type="text"
+                      name="subestilo"
+                      value={searchFilters.subestilo}
+                      onChange={handleSearchChange}
+                      className="form-input"
+                      placeholder="Buscar por temática..."
+                      list="search-subestilos"
+                      data-testid="search-subestilo-input"
+                    />
+                    <datalist id="search-subestilos">
+                      {autocompleteData.subestilos?.map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="form-label">Interacción</label>
+                    <input
+                      type="text"
+                      name="interaccion"
+                      value={searchFilters.interaccion}
+                      onChange={handleSearchChange}
+                      className="form-input"
+                      placeholder="Buscar por interacción..."
+                      list="search-interacciones"
+                      data-testid="search-interaccion-input"
+                    />
+                    <datalist id="search-interacciones">
+                      {autocompleteData.interacciones?.map(i => (
+                        <option key={i} value={i} />
                       ))}
                     </datalist>
                   </div>
@@ -2109,7 +2260,9 @@ function App() {
                           <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
                             <div>
                               {game.autor && <p><strong>Autor:</strong> {game.autor}</p>}
-                              {game.categoria && <p><strong>Categoría:</strong> {game.categoria}</p>}
+                              {game.categoria && <p><strong>Estilo:</strong> {game.categoria}</p>}
+                              {game.subestilo && <p><strong>Temática:</strong> {game.subestilo}</p>}
+                              {game.interaccion && <p><strong>Interacción:</strong> {game.interaccion}</p>}
                               {game.editorial && <p><strong>Editorial:</strong> {game.editorial}</p>}
                             </div>
                             <div>
