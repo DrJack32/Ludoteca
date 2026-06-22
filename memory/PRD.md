@@ -40,10 +40,20 @@ Aplicación web/móvil (Android) para gestionar una ludoteca personal de 600+ ju
 
 3. **Backup y Restauración (Feb 2026)**:
    - Backend `GET /api/backup`: descarga JSON con todos los juegos (incluyendo imágenes base64), versión, fecha y total.
-   - Backend `POST /api/restore`: dos modos:
-     - `reemplazar`: borra todo y restaura desde el archivo (devuelve `eliminados_previos` + `importados`)
-     - `fusionar`: actualiza juegos con mismo ID, añade los nuevos (preserva colección actual)
-   - Frontend: panel `BackupRestorePanel` integrado al inicio de la pantalla Estadísticas. Botones "📥 Descargar Backup" (genera `mi-ludoteca-backup-YYYY-MM-DD.json`) y "📂 Restaurar desde Backup" (file picker + modal de confirmación con radio buttons para elegir modo).
+   - Backend `POST /api/restore`: dos modos: `reemplazar` o `fusionar`.
+   - Frontend: panel `BackupRestorePanel` integrado al inicio de la pantalla Estadísticas.
+
+4. **Categorización de 3 niveles (Feb 2026)**:
+   - Nuevos campos `subestilo` (UI: "Temática") e `interaccion` añadidos a `Game`, `GameCreate`, `GameUpdate`, `SearchFilters`, `RecommendRequest`.
+   - Label UI del campo existente `categoria` renombrada a "Estilo de juego" (DB key intacta para preservar datos).
+   - Endpoint `/api/autocomplete` extendido con `subestilos` e `interacciones`. Fusiona valores de BBDD con defaults (case-insensitive dedupe + sort).
+     - Defaults Estilo: Eurogame, Familiar, Party, Estrategia, Abstracto, Sandbox, Wargame, Colocación de trabajadores, Filler, Deckbuilding, Set collection, Area control, Push your luck, Tile placement, Roll & write.
+     - Defaults Temática: Espacio, Granja, Mar, Fantasía, Medieval, Ciencia ficción, Histórico, Naturaleza, Mitología, Aventura, Terror, Económico, Guerra.
+     - Defaults Interacción: Solitario, Cooperativo, Semi-cooperativo, Competitivo directo, Competitivo indirecto, Negociación, Equipos, Todos contra uno.
+   - `/api/games/search` filtra por los 2 nuevos campos (regex case-insensitive).
+   - `/api/recommend` añade los nuevos campos como filtro AND en Mongo + suma 8 puntos cada uno al score con razones "🎨 Temática: …" y "🤝 Interacción: …".
+   - Frontend: 3 inputs con datalist en AddGameScreen, EditGameScreen, SearchScreen y panel "Esta noche jugamos…".
+   - Tests pytest `/app/backend/tests/test_categorization.py` (11 casos, 100% pasando).
 
 ## Files of reference
 - `/app/backend/server.py`: API routes
