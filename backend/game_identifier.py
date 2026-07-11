@@ -3,14 +3,17 @@ Servicio de identificación de juegos: GPT-4o vision + BoardGameGeek API.
 """
 import os
 import re
+import io
+import base64
 import uuid
 import json
 import logging
 import asyncio
 import xml.etree.ElementTree as ET
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 import httpx
+from PIL import Image, ImageOps
 from pydantic import BaseModel
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
@@ -19,6 +22,65 @@ logger = logging.getLogger(__name__)
 BGG_BASE = "https://boardgamegeek.com/xmlapi2"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 BGG_TOKEN = os.environ.get("BGG_API_TOKEN", "")
+
+
+class ImageProcessingError(Exception):
+    """Raised when the input image cannot be decoded or normalized."""
+
+
+def _normalize_image_to_jpeg_b64(data: str, max_side: int = 1280, quality: int = 82) -> str:
+    """Decode ANY input (data URL / raw base64 / any format PIL can read: PNG/JPEG/WEBP/HEIC/BMP/GIF)
+    and re-encode it as a clean JPEG base64 string that OpenAI vision accepts.
+    Raises ImageProcessingError with a user-facing message on any failure.
+    """
+    if not data or not isinstance(data, str):
+        raise ImageProcessingError("La imagen está vacía.")
+
+    # Strip data-URL prefix if present, tolerate leading/trailing whitespace
+    payload = data.strip()
+    if payload.startswith("data:") and "," in payload:
+        payload = payload.split(",", 1)[1]
+    # Remove whitespace/newlines that some clients inject
+    payload = re.sub(r"\s+", "", payload)
+    # Fix padding
+    padding = (-len(payload)) % 4
+    if padding:
+        payload += "=" * padding
+
+    try:
+        raw = base64.b64decode(payload, validate=False)
+    except Exception as e:
+        raise ImageProcessingError(f"No se pudo decodificar la imagen (base64 inválido): {e}")
+
+    if len(raw) < 100:
+        raise ImageProcessingError("La imagen es demasiado pequeña o está corrupta.")
+
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img.load()  # force decode
+    except Exception as e:
+        raise ImageProcessingError(f"No se pudo abrir la imagen (formato no soportado): {e}")
+
+    # Apply EXIF orientation and convert to RGB
+    try:
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+    elif img.mode == "L":
+        img = img.convert("RGB")
+
+    # Resize (long edge)
+    w, h = img.size
+    if max(w, h) > max_side:
+        ratio = max_side / float(max(w, h))
+        img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+
+    # Encode as JPEG
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality, optimize=True)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def _bgg_headers() -> Dict[str, str]:
@@ -96,8 +158,12 @@ def _strip_html(text: str) -> str:
 
 # ---------- GPT-4o vision: identify game from photo ----------
 async def identify_game_from_image(image_base64: str) -> IdentifyResponse:
-    """Use GPT-4o vision to extract probable game titles (and barcode if visible)."""
-    clean_b64 = _clean_base64(image_base64)
+    """Use GPT-4o vision to extract probable game titles (and barcode if visible).
+    Normalizes the image server-side (any input format → clean JPEG ≤1280px) and
+    retries transient failures once. Raises ImageProcessingError for invalid input.
+    """
+    # 1) Normalize + validate the image (raises ImageProcessingError on invalid input)
+    clean_b64 = _normalize_image_to_jpeg_b64(image_base64)
 
     system_msg = (
         "Eres un experto en juegos de mesa. Te darán una foto de la portada de un juego de mesa "
@@ -111,26 +177,43 @@ async def identify_game_from_image(image_base64: str) -> IdentifyResponse:
         "- Si no es un juego de mesa, devuelve {\"titulos\": [], \"codigo_barras\": null}."
     )
 
-    chat = LlmChat(
-        api_key=EMERGENT_KEY,
-        session_id=f"identify-{uuid.uuid4()}",
-        system_message=system_msg,
-    ).with_model("openai", "gpt-4o")
+    # 2) Try up to 2 times to handle transient errors (rate limits, timeouts)
+    last_error: Optional[Exception] = None
+    raw = None
+    for attempt in range(2):
+        chat = LlmChat(
+            api_key=EMERGENT_KEY,
+            session_id=f"identify-{uuid.uuid4()}",
+            system_message=system_msg,
+        ).with_model("openai", "gpt-4o")
 
-    msg = UserMessage(
-        text="Identifica este juego de mesa. Devuelve solo JSON.",
-        file_contents=[ImageContent(image_base64=clean_b64)],
-    )
-
-    try:
-        raw = await chat.send_message(msg)
-    except Exception as e:
-        logger.exception("GPT-4o identify failed: %s", e)
-        raise
+        msg = UserMessage(
+            text="Identifica este juego de mesa. Devuelve solo JSON.",
+            file_contents=[ImageContent(image_base64=clean_b64)],
+        )
+        try:
+            raw = await chat.send_message(msg)
+            break
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            # Non-retryable: invalid image content from OpenAI's perspective
+            if "unsupported image" in err_str or "invalid base64" in err_str or "invalid image" in err_str:
+                logger.error("GPT-4o rejected image after normalization: %s", e)
+                raise ImageProcessingError(
+                    "OpenAI no pudo procesar la imagen. Intenta con otra foto (JPG/PNG estándar, con buena iluminación)."
+                )
+            logger.warning("GPT-4o identify attempt %d failed: %s", attempt + 1, e)
+            if attempt == 0:
+                await asyncio.sleep(1.2)  # brief backoff
+                continue
+            # Second attempt failed → bubble up
+            logger.exception("GPT-4o identify failed after retries")
+            raise
 
     logger.info("GPT-4o identify raw response: %s", raw)
     # Extract JSON from response
-    text = raw.strip()
+    text = (raw or "").strip()
     # Remove markdown fences if present
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.MULTILINE).strip()
     try:

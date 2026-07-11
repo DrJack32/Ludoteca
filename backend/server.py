@@ -26,6 +26,7 @@ from game_identifier import (
     BggSearchResult,
     BggDetails,
     BggExpansion,
+    ImageProcessingError,
 )
 
 # MongoDB connection
@@ -440,9 +441,16 @@ async def identify_game(req: IdentifyRequest):
         raise HTTPException(status_code=400, detail="Falta la imagen")
     try:
         return await identify_game_from_image(req.imagen)
+    except ImageProcessingError as e:
+        # User-facing image issue (bad format, corrupt, too small, OpenAI rejected)
+        logger.warning("identify_game: image processing issue: %s", e)
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.exception("identify_game failed")
-        raise HTTPException(status_code=500, detail=f"Error al identificar: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="El servicio de IA no está disponible temporalmente. Inténtalo de nuevo en unos segundos.",
+        )
 
 
 @api_router.get("/bgg/search", response_model=List[BggSearchResult])
