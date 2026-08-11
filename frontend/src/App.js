@@ -485,8 +485,12 @@ function App() {
       setIaCandidates([]);
       setIaStatus('identifying');
       try {
-        // 1) Ask GPT-4o to identify the game
-        const idRes = await axios.post(`${API}/identify-game`, { imagen: imageBase64 });
+        // 1) Ask GPT-4o to identify the game (90s timeout — vision can take up to 30s)
+        const idRes = await axios.post(
+          `${API}/identify-game`,
+          { imagen: imageBase64 },
+          { timeout: 90000 }
+        );
         const titulos = idRes.data.titulos || [];
         if (titulos.length === 0) {
           setIaStatus('error');
@@ -500,12 +504,14 @@ function App() {
         setIaManualQuery(topTitle);
         const bggRes = await axios.get(`${API}/bgg/search`, {
           params: { q: topTitle, limit: 5 },
+          timeout: 30000,
         });
         if (!bggRes.data || bggRes.data.length === 0) {
           // Try second candidate if available
           if (titulos[1]) {
             const bggRes2 = await axios.get(`${API}/bgg/search`, {
               params: { q: titulos[1], limit: 5 },
+              timeout: 30000,
             });
             if (bggRes2.data && bggRes2.data.length > 0) {
               setIaSearchedTitle(titulos[1]);
@@ -524,7 +530,20 @@ function App() {
       } catch (err) {
         console.error('AI flow error:', err);
         setIaStatus('error');
-        setIaError(err.response?.data?.detail || 'Error al identificar el juego con IA.');
+        // Build a helpful, specific error message so it never looks generic
+        let msg = '';
+        if (err.code === 'ECONNABORTED' || /timeout/i.test(err.message || '')) {
+          msg = '⏱️ La IA tardó demasiado en responder. Prueba de nuevo o con otra foto.';
+        } else if (err.response?.data?.detail) {
+          msg = `❌ ${err.response.data.detail}`;
+        } else if (err.response?.status) {
+          msg = `❌ Error ${err.response.status} del servidor. Vuelve a intentarlo en unos segundos.`;
+        } else if (err.message === 'Network Error' || !err.response) {
+          msg = '🌐 Sin conexión con el servidor. Comprueba tu Internet y vuelve a intentarlo.';
+        } else {
+          msg = `❌ ${err.message || 'Error desconocido al identificar el juego con IA.'}`;
+        }
+        setIaError(msg);
       }
     };
 
@@ -734,6 +753,15 @@ function App() {
                   <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
                     <p className="text-red-800 font-medium">⚠️ {iaError}</p>
                   </div>
+                  {formData.imagen && (
+                    <button
+                      onClick={() => runAIFlow(formData.imagen)}
+                      className="w-full mb-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                      data-testid="ia-retry-btn"
+                    >
+                      🔄 Reintentar con la misma foto
+                    </button>
+                  )}
                   <div className="flex gap-2">
                     <input
                       type="text"
