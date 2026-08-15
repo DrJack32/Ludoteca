@@ -486,11 +486,30 @@ function App() {
       setIaStatus('identifying');
       try {
         // 1) Ask GPT-4o to identify the game (90s timeout — vision can take up to 30s)
-        const idRes = await axios.post(
-          `${API}/identify-game`,
-          { imagen: imageBase64 },
-          { timeout: 90000 }
-        );
+        //    Retry once automatically on transient errors (404/502/503/504/timeout)
+        //    which happen when the backend is briefly reloading.
+        const postWithRetry = async () => {
+          try {
+            return await axios.post(
+              `${API}/identify-game`,
+              { imagen: imageBase64 },
+              { timeout: 90000 }
+            );
+          } catch (e) {
+            const status = e.response?.status;
+            const transient = status === 404 || status === 502 || status === 503 || status === 504
+              || e.code === 'ECONNABORTED' || /timeout|Network Error/i.test(e.message || '');
+            if (!transient) throw e;
+            // Wait 2s and retry once
+            await new Promise(r => setTimeout(r, 2000));
+            return await axios.post(
+              `${API}/identify-game`,
+              { imagen: imageBase64 },
+              { timeout: 90000 }
+            );
+          }
+        };
+        const idRes = await postWithRetry();
         const titulos = idRes.data.titulos || [];
         if (titulos.length === 0) {
           setIaStatus('error');
