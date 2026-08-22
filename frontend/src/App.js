@@ -5,10 +5,10 @@ import axios from "axios";
 import MobileImageCapture from "./components/MobileImageCapture";
 import { useCapacitor } from "./hooks/useCapacitor";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://ludoteca-api-7q6d.onrender.com";
 const API = `${BACKEND_URL}/api`;
 
-// Resize/compress an image data URL so it fits within OpenAI's payload limits
+// Resize/compress an image data URL before sending it to the vision service
 // and reduces MongoDB document size. Returns a JPEG data URL.
 const resizeImageDataUrl = (dataUrl, maxSize = 1600, quality = 0.85) =>
   new Promise((resolve, reject) => {
