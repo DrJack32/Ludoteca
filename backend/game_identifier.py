@@ -1,11 +1,10 @@
 """
-Servicio de identificación de juegos: GPT-4o vision + BoardGameGeek API.
+Servicio de identificación de juegos: Gemini Vision + BoardGameGeek API.
 """
 import os
 import re
 import io
 import base64
-import uuid
 import json
 import logging
 import asyncio
@@ -15,12 +14,13 @@ from typing import List, Optional, Dict, Any, Tuple
 import httpx
 from PIL import Image, ImageOps
 from pydantic import BaseModel
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
 BGG_BASE = "https://boardgamegeek.com/xmlapi2"
-EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 BGG_TOKEN = os.environ.get("BGG_API_TOKEN", "")
 
 
@@ -156,9 +156,9 @@ def _strip_html(text: str) -> str:
     return text.strip()
 
 
-# ---------- GPT-4o vision: identify game from photo ----------
+# ---------- Gemini Vision: identify game from photo ----------
 async def identify_game_from_image(image_base64: str) -> IdentifyResponse:
-    """Use GPT-4o vision to extract probable game titles (and barcode if visible).
+    """Use Gemini Vision to extract probable game titles (and barcode if visible).
     Normalizes the image server-side (any input format → clean JPEG ≤1280px) and
     retries transient failures once. Raises ImageProcessingError for invalid input.
     """
@@ -177,41 +177,48 @@ async def identify_game_from_image(image_base64: str) -> IdentifyResponse:
         "- Si no es un juego de mesa, devuelve {\"titulos\": [], \"codigo_barras\": null}."
     )
 
+    if not GEMINI_API_KEY:
+        raise RuntimeError("Falta configurar GEMINI_API_KEY en el servidor")
+
     # 2) Try up to 2 times to handle transient errors (rate limits, timeouts)
-    last_error: Optional[Exception] = None
     raw = None
     for attempt in range(2):
-        chat = LlmChat(
-            api_key=EMERGENT_KEY,
-            session_id=f"identify-{uuid.uuid4()}",
-            system_message=system_msg,
-        ).with_model("openai", "gpt-4o")
-
-        msg = UserMessage(
-            text="Identifica este juego de mesa. Devuelve solo JSON.",
-            file_contents=[ImageContent(image_base64=clean_b64)],
-        )
         try:
-            raw = await chat.send_message(msg)
+            image_bytes = base64.b64decode(clean_b64)
+
+            def _generate():
+                client = genai.Client(api_key=GEMINI_API_KEY)
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[
+                        types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                        system_msg + "\nIdentifica este juego de mesa. Devuelve solo JSON.",
+                    ],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    ),
+                )
+                return response.text
+
+            raw = await asyncio.to_thread(_generate)
             break
         except Exception as e:
-            last_error = e
             err_str = str(e).lower()
-            # Non-retryable: invalid image content from OpenAI's perspective
+            # Non-retryable: invalid image content from Gemini's perspective
             if "unsupported image" in err_str or "invalid base64" in err_str or "invalid image" in err_str:
-                logger.error("GPT-4o rejected image after normalization: %s", e)
+                logger.error("Gemini rejected image after normalization: %s", e)
                 raise ImageProcessingError(
-                    "OpenAI no pudo procesar la imagen. Intenta con otra foto (JPG/PNG estándar, con buena iluminación)."
+                    "Gemini no pudo procesar la imagen. Intenta con otra foto (JPG/PNG estándar, con buena iluminación)."
                 )
-            logger.warning("GPT-4o identify attempt %d failed: %s", attempt + 1, e)
+            logger.warning("Gemini identify attempt %d failed: %s", attempt + 1, e)
             if attempt == 0:
                 await asyncio.sleep(1.2)  # brief backoff
                 continue
             # Second attempt failed → bubble up
-            logger.exception("GPT-4o identify failed after retries")
+            logger.exception("Gemini identify failed after retries")
             raise
 
-    logger.info("GPT-4o identify raw response: %s", raw)
+    logger.info("Gemini identify raw response: %s", raw)
     # Extract JSON from response
     text = (raw or "").strip()
     # Remove markdown fences if present
@@ -292,7 +299,7 @@ async def bgg_search(query: str, limit: int = 5) -> List[BggSearchResult]:
 
 # ---------- BGG: details + Spanish translation ----------
 async def bgg_get_details(bgg_id: str, translate: bool = True) -> BggDetails:
-    """Fetch full BGG details and translate name/description to Spanish via GPT-4o."""
+    """Fetch full BGG details and translate name/description to Spanish via Gemini."""
     async with httpx.AsyncClient(timeout=30.0, headers=_bgg_headers()) as client:
         r = await client.get(f"{BGG_BASE}/thing", params={"id": bgg_id, "stats": 1})
         if r.status_code != 200:
@@ -390,7 +397,7 @@ async def bgg_get_details(bgg_id: str, translate: bool = True) -> BggDetails:
     nombre_es = nombre_en
     desc_es = desc_clean
     categoria_es = categoria
-    if translate and EMERGENT_KEY and (desc_clean or categoria):
+    if translate and GEMINI_API_KEY and (desc_clean or categoria):
         try:
             nombre_es, desc_es, categoria_es = await _translate_to_spanish(
                 nombre_en, desc_clean, categoria
@@ -416,7 +423,7 @@ async def bgg_get_details(bgg_id: str, translate: bool = True) -> BggDetails:
 
 
 async def _translate_to_spanish(name: str, desc: str, categoria: str):
-    """Translate BGG fields to Spanish via GPT-4o."""
+    """Translate BGG fields to Spanish via Gemini."""
     system = (
         "Eres un traductor profesional especializado en juegos de mesa. "
         "Te darán el nombre, la descripción y la categoría de un juego en inglés. "
@@ -430,14 +437,21 @@ async def _translate_to_spanish(name: str, desc: str, categoria: str):
     )
     payload = json.dumps({"nombre": name, "descripcion": desc, "categoria": categoria}, ensure_ascii=False)
 
-    chat = LlmChat(
-        api_key=EMERGENT_KEY,
-        session_id=f"translate-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("openai", "gpt-4o")
+    if not GEMINI_API_KEY:
+        return name, desc, categoria
 
-    msg = UserMessage(text=f"Traduce al español este JSON:\n{payload}")
-    raw = await chat.send_message(msg)
+    def _generate_translation():
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=system + f"\nTraduce al español este JSON:\n{payload}",
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
+        )
+        return response.text
+
+    raw = await asyncio.to_thread(_generate_translation)
     text = raw.strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.MULTILINE).strip()
     try:
