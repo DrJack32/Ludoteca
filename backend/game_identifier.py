@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 BGG_BASE = "https://boardgamegeek.com/xmlapi2"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
 BGG_TOKEN = os.environ.get("BGG_API_TOKEN", "")
 
 
@@ -189,7 +190,7 @@ async def identify_game_from_image(image_base64: str) -> IdentifyResponse:
             def _generate():
                 client = genai.Client(api_key=GEMINI_API_KEY)
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=GEMINI_MODEL,
                     contents=[
                         types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
                         system_msg + "\nIdentifica este juego de mesa. Devuelve solo JSON.",
@@ -443,7 +444,7 @@ async def _translate_to_spanish(name: str, desc: str, categoria: str):
     def _generate_translation():
         client = genai.Client(api_key=GEMINI_API_KEY)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             contents=system + f"\nTraduce al español este JSON:\n{payload}",
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
