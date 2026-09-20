@@ -1,0 +1,53 @@
+name: Mantener MongoDB Atlas activo
+
+on:
+  schedule:
+    # Lectura real de MongoDB cada domingo a las 07:17 UTC.
+    - cron: '17 7 * * 0'
+    # Actualiza un archivo mensual para que GitHub no desactive la tarea por inactividad.
+    - cron: '29 7 1 * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas-keepalive.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atlas-keepalive
+  cancel-in-progress: false
+
+jobs:
+  keep-atlas-active:
+    name: Consultar Ludoteca en Atlas
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Despertar Render y consultar MongoDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl             --fail-with-body             --location             --silent             --show-error             --retry 6             --retry-delay 15             --retry-all-errors             --connect-timeout 30             --max-time 300             'https://ludoteca-api-7q6d.onrender.com/api/games?limit=1'             --output response.json
+
+          jq -e 'type == "array"' response.json >/dev/null
+          echo "Ludoteca respondió correctamente y Atlas recibió una consulta real."
+
+      - name: Mantener habilitada la programación de GitHub
+        if: github.event_name == 'schedule' && github.event.schedule == '29 7 1 * *'
+        uses: actions/checkout@v4
+
+      - name: Registrar actividad mensual
+        if: github.event_name == 'schedule' && github.event.schedule == '29 7 1 * *'
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +'Última comprobación mensual: %Y-%m-%dT%H:%M:%SZ' > .github/atlas-keepalive-last-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/atlas-keepalive-last-run.txt
+          git diff --cached --quiet && exit 0
+          git commit -m 'Mantener activa la tarea de Atlas [skip ci]'
+          git push
